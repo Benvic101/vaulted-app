@@ -4,9 +4,11 @@ import Bookings from "./Bookings"
 import Clients from "./Clients"
 import ConsentForms from "./ConsentForms"
 import Payments from "./Payments"
+import Settings from "./Settings"
+import Portfolio from "./Portfolio"
 import {
   LayoutDashboard, CalendarDays, Users, FileText,
-  Image, CreditCard, Settings, LogOut, TrendingUp
+  Image, CreditCard, SettingsIcon, LogOut, TrendingUp
 } from "lucide-react"
 
 export default function Dashboard() {
@@ -19,14 +21,7 @@ export default function Dashboard() {
     pendingConsents: 0,
   })
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user)
-      if (data.user) fetchStats(data.user.id)
-    })
-  }, [])
-
-  const fetchStats = async (artistId) => {
+    const fetchStats = async (artistId) => {
     const { count: clientCount } = await supabase
       .from("clients")
       .select("*", { count: "exact", head: true })
@@ -63,6 +58,14 @@ export default function Dashboard() {
     })
   }
 
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user)
+      if (data.user) fetchStats(data.user.id)
+    })
+  }, [])
+
+
   const navItems = [
     { icon: <LayoutDashboard size={18} />, label: "Dashboard" },
     { icon: <CalendarDays size={18} />, label: "Bookings" },
@@ -70,7 +73,7 @@ export default function Dashboard() {
     { icon: <FileText size={18} />, label: "Consent Forms" },
     { icon: <Image size={18} />, label: "Portfolio" },
     { icon: <CreditCard size={18} />, label: "Payments" },
-    { icon: <Settings size={18} />, label: "Settings" },
+    { icon: <SettingsIcon size={18} />, label: "Settings" },
   ]
 
   const statCards = [
@@ -133,6 +136,8 @@ export default function Dashboard() {
         {activePage === "clients" && <Clients />}
         {activePage === "consent forms" && <ConsentForms />}
         {activePage === "payments" && <Payments />}
+        {activePage === "settings" && <Settings />}
+        {activePage === "portfolio" && <Portfolio />}
 
         {activePage === "dashboard" && (
           <>
