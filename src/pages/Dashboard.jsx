@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { supabase } from "../supabase"
+import logo from "../assets/logo.png"
 import Bookings from "./Bookings"
 import Clients from "./Clients"
 import ConsentForms from "./ConsentForms"
@@ -96,7 +97,17 @@ export default function Dashboard() {
       {/* Sidebar */}
       <div style={styles.sidebar}>
         <div style={styles.sidebarBrand}>
-          <span style={styles.sidebarLogo}>◈</span>
+          <img
+  src={logo}
+  alt="Vaulted"
+  style={{
+    width: "32px",
+    height: "32px",
+    objectFit: "cover",
+    borderRadius: "50%",
+    border: "1px solid #1e1e1e",
+  }}
+/>
           <h2 style={styles.sidebarTitle}>Vaulted</h2>
         </div>
 

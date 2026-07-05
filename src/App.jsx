@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { supabase } from "./supabase"
 import Dashboard from "./pages/Dashboard"
 import { Mail, Lock, Palette } from "lucide-react"
+import logo from "./assets/logo.png"
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -42,7 +43,17 @@ export default function App() {
       <div style={styles.left}>
         <div style={styles.leftContent}>
           <div style={styles.brandRow}>
-            <Palette size={32} color="#d4a843" />
+            <img
+  src={logo}
+  alt="Vaulted"
+  style={{
+    width: "40px",
+    height: "40px",
+    objectFit: "cover",
+    borderRadius: "50%",
+    border: "1px solid #1e1e1e",
+  }}
+/>
             <h1 style={styles.brandName}>Vaulted</h1>
           </div>
           <h2 style={styles.tagline}>Your Studio,<br />refined for artists.</h2>
