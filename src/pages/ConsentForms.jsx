@@ -6,6 +6,7 @@ export default function ConsentForms() {
   const [view, setView] = useState("list")
   const [forms, setForms] = useState([])
   const [loading, setLoading] = useState(false)
+  const [listLoading, setListLoading] = useState(true)
   const [message, setMessage] = useState("")
   const [form, setForm] = useState({
     client_name: "", client_email: "", date: "",
@@ -19,12 +20,14 @@ export default function ConsentForms() {
   useEffect(() => { fetchForms() }, [])
 
   const fetchForms = async () => {
+    setListLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
     const { data, error } = await supabase
       .from("consent_forms")
       .select("*")
       .eq("artist_id", user.id)
     if (!error) setForms(data)
+    setListLoading(false)
   }
 
   const handleChange = (e) => {
@@ -101,7 +104,7 @@ export default function ConsentForms() {
       <div style={styles.divider} />
 
       {view === "form" && (
-        <div style={styles.form}>
+        <form style={styles.form} onSubmit={(e) => { e.preventDefault(); handleSubmit() }}>
 
           {/* Client Details */}
           <div style={styles.section}>
@@ -110,14 +113,14 @@ export default function ConsentForms() {
               <div style={styles.field}>
                 <label style={styles.label}>Full Name *</label>
                 <div style={styles.inputWrapper}>
-                  <User size={15} color="#444" style={styles.inputIcon} />
+                  <User size={15} color="#6b6b6b" style={styles.inputIcon} />
                   <input style={styles.input} name="client_name" placeholder="Full name" value={form.client_name} onChange={handleChange} />
                 </div>
               </div>
               <div style={styles.field}>
                 <label style={styles.label}>Email *</label>
                 <div style={styles.inputWrapper}>
-                  <Mail size={15} color="#444" style={styles.inputIcon} />
+                  <Mail size={15} color="#6b6b6b" style={styles.inputIcon} />
                   <input style={styles.input} name="client_email" placeholder="email@example.com" value={form.client_email} onChange={handleChange} />
                 </div>
               </div>
@@ -125,7 +128,7 @@ export default function ConsentForms() {
             <div style={styles.field}>
               <label style={styles.label}>Appointment Date *</label>
               <div style={styles.inputWrapper}>
-                <CalendarDays size={15} color="#444" style={styles.inputIcon} />
+                <CalendarDays size={15} color="#6b6b6b" style={styles.inputIcon} />
                 <input style={styles.input} name="date" type="date" value={form.date} onChange={handleChange} />
               </div>
             </div>
@@ -163,16 +166,21 @@ export default function ConsentForms() {
             </div>
           </div>
 
-          <button style={styles.button} onClick={handleSubmit} disabled={loading}>
+          <button type="submit" style={styles.button} disabled={loading}>
             {loading ? "Saving..." : "Save Consent Form"}
           </button>
           {message && <p style={styles.message}>{message}</p>}
-        </div>
+        </form>
       )}
 
       {view === "list" && (
         <div>
-          {forms.length === 0 ? (
+          {listLoading ? (
+            <div style={styles.emptyState}>
+              <FileText size={36} color="#5c5c5c" />
+              <p style={styles.emptyText}>Loading consent forms…</p>
+            </div>
+          ) : forms.length === 0 ? (
             <div style={styles.emptyState}>
               <FileText size={36} color="#222" />
               <p style={styles.emptyText}>No consent forms yet. Create your first one!</p>
@@ -182,13 +190,13 @@ export default function ConsentForms() {
               {forms.map((f) => (
                 <div key={f.id} style={styles.formCard}>
                   <div style={styles.formIconBox}>
-                    <FileText size={20} color="#d4a843" />
+                    <FileText size={20} color="#c9974a" />
                   </div>
                   <div style={styles.formInfo}>
                     <h3 style={styles.formName}>{f.client_name}</h3>
                     <div style={styles.formMeta}>
-                      <span style={styles.formMetaItem}><Mail size={12} color="#444" /> {f.client_email}</span>
-                      <span style={styles.formMetaItem}><CalendarDays size={12} color="#444" /> {f.date}</span>
+                      <span style={styles.formMetaItem}><Mail size={12} color="#6b6b6b" /> {f.client_email}</span>
+                      <span style={styles.formMetaItem}><CalendarDays size={12} color="#6b6b6b" /> {f.date}</span>
                     </div>
                   </div>
                   <div style={styles.formRight}>
@@ -214,37 +222,37 @@ export default function ConsentForms() {
 const styles = {
   container: { padding: "48px 52px", fontFamily: "'DM Sans', sans-serif", color: "#f5f5f5", minHeight: "100vh", background: "#0a0a0a" },
   header: { display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "24px" },
-  headerSub: { color: "#444", fontSize: "12px", textTransform: "uppercase", letterSpacing: "1px", margin: "0 0 6px 0" },
+  headerSub: { color: "#6b6b6b", fontSize: "12px", textTransform: "uppercase", letterSpacing: "1px", margin: "0 0 6px 0" },
   headerTitle: { fontFamily: "'Playfair Display', serif", fontSize: "32px", margin: 0, fontWeight: "600" },
-  newBtn: { display: "flex", alignItems: "center", gap: "8px", padding: "10px 20px", background: "#d4a843", border: "none", borderRadius: "8px", color: "#0a0a0a", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+  newBtn: { display: "flex", alignItems: "center", gap: "8px", padding: "10px 20px", background: "#c9974a", border: "none", borderRadius: "8px", color: "#0a0a0a", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
   divider: { height: "1px", background: "#1a1a1a", marginBottom: "40px" },
   form: { display: "flex", flexDirection: "column", gap: "24px", maxWidth: "700px" },
-  section: { background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "24px", display: "flex", flexDirection: "column", gap: "16px" },
+  section: { background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "24px", display: "flex", flexDirection: "column", gap: "16px" },
   sectionTitle: { fontFamily: "'Playfair Display', serif", color: "#f5f5f5", fontSize: "16px", margin: 0, fontWeight: "400" },
-  sectionSub: { color: "#444", fontSize: "12px", margin: 0 },
+  sectionSub: { color: "#6b6b6b", fontSize: "12px", margin: 0 },
   formGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" },
   field: { display: "flex", flexDirection: "column", gap: "8px" },
   label: { fontSize: "12px", color: "#555", textTransform: "uppercase", letterSpacing: "0.5px" },
   inputWrapper: { position: "relative" },
   inputIcon: { position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" },
-  input: { width: "100%", padding: "12px 16px 12px 40px", background: "#111", border: "1px solid #1a1a1a", borderRadius: "8px", color: "#f5f5f5", fontSize: "14px", outline: "none", boxSizing: "border-box", fontFamily: "'DM Sans', sans-serif" },
+  input: { width: "100%", padding: "12px 16px 12px 40px", background: "#141416", border: "1px solid #1a1a1a", borderRadius: "8px", color: "#f5f5f5", fontSize: "14px", outline: "none", boxSizing: "border-box", fontFamily: "'DM Sans', sans-serif" },
   checkboxGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" },
   consentList: { display: "flex", flexDirection: "column", gap: "12px" },
   checkboxLabel: { display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" },
-  checkbox: { width: "16px", height: "16px", cursor: "pointer", accentColor: "#d4a843" },
+  checkbox: { width: "16px", height: "16px", cursor: "pointer", accentColor: "#c9974a" },
   checkboxText: { color: "#888", fontSize: "14px" },
-  button: { padding: "13px", background: "#d4a843", border: "none", borderRadius: "8px", color: "#0a0a0a", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
-  message: { color: "#d4a843", fontSize: "13px", textAlign: "center", margin: 0 },
-  emptyState: { background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "60px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "16px" },
-  emptyText: { color: "#333", fontSize: "14px", margin: 0 },
+  button: { padding: "13px", background: "#c9974a", border: "none", borderRadius: "8px", color: "#0a0a0a", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+  message: { color: "#c9974a", fontSize: "13px", textAlign: "center", margin: 0 },
+  emptyState: { background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "60px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "16px" },
+  emptyText: { color: "#5c5c5c", fontSize: "14px", margin: 0 },
   formsList: { display: "flex", flexDirection: "column", gap: "12px" },
-  formCard: { display: "flex", alignItems: "center", gap: "20px", background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "20px 24px" },
-  formIconBox: { width: "44px", height: "44px", borderRadius: "10px", background: "rgba(212,168,67,0.05)", border: "1px solid rgba(212,168,67,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  formCard: { display: "flex", alignItems: "center", gap: "20px", background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "20px 24px" },
+  formIconBox: { width: "44px", height: "44px", borderRadius: "10px", background: "rgba(201,151,74,0.05)", border: "1px solid rgba(201,151,74,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
   formInfo: { flex: 1 },
   formName: { color: "#f5f5f5", fontSize: "16px", margin: "0 0 8px 0", fontWeight: "500" },
   formMeta: { display: "flex", gap: "16px" },
-  formMetaItem: { display: "flex", alignItems: "center", gap: "6px", color: "#444", fontSize: "13px" },
+  formMetaItem: { display: "flex", alignItems: "center", gap: "6px", color: "#6b6b6b", fontSize: "13px" },
   formRight: { textAlign: "right" },
   signedBadge: { display: "inline-flex", alignItems: "center", gap: "6px", padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", background: "rgba(45,106,79,0.15)", color: "#2d6a4f", border: "1px solid rgba(45,106,79,0.2)", marginBottom: "8px" },
-  formDate: { color: "#444", fontSize: "12px", margin: 0 },
+  formDate: { color: "#6b6b6b", fontSize: "12px", margin: 0 },
 }

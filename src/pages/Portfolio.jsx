@@ -6,6 +6,7 @@ const CATEGORIES = ["All", "Traditional", "Realism", "Blackwork", "Fine Line", "
 
 export default function Portfolio() {
   const [items, setItems] = useState([])
+  const [listLoading, setListLoading] = useState(true)
   const [filter, setFilter] = useState("All")
   const [uploading, setUploading] = useState(false)
   const [message, setMessage] = useState("")
@@ -24,7 +25,10 @@ export default function Portfolio() {
         .eq("artist_id", user.id)
         .order("created_at", { ascending: false })
 
-      if (isMounted && data) setItems(data)
+      if (isMounted) {
+        setItems(data || [])
+        setListLoading(false)
+      }
     }
 
     loadItems()
@@ -82,10 +86,20 @@ export default function Portfolio() {
     setUploading(false)
   }
 
-  const handleDelete = async (id) => {
-    const { error } = await supabase.from("portfolio_items").delete().eq("id", id)
+  const handleDelete = async (item) => {
+    if (!window.confirm("Delete this piece? This cannot be undone.")) return
+
+    const marker = "/portfolio/"
+    const idx = item.image_url.indexOf(marker)
+    const storagePath = idx >= 0 ? item.image_url.slice(idx + marker.length) : null
+
+    if (storagePath) {
+      await supabase.storage.from("portfolio").remove([storagePath])
+    }
+
+    const { error } = await supabase.from("portfolio_items").delete().eq("id", item.id)
     if (!error) {
-      setItems(items.filter((item) => item.id !== id))
+      setItems(items.filter((i) => i.id !== item.id))
     }
   }
 
@@ -100,7 +114,7 @@ export default function Portfolio() {
 
       <div style={styles.divider} />
 
-      <div style={styles.uploadSection}>
+      <form style={styles.uploadSection} onSubmit={(e) => { e.preventDefault(); handleUpload() }}>
         <h3 style={styles.sectionTitle}>Add New Piece</h3>
         <div style={styles.uploadRow}>
           <input
@@ -120,12 +134,12 @@ export default function Portfolio() {
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
           />
-          <button style={styles.button} onClick={handleUpload} disabled={uploading}>
+          <button type="submit" style={styles.button} disabled={uploading}>
             <Upload size={16} /> {uploading ? "Uploading..." : "Upload"}
           </button>
         </div>
         {message && <p style={styles.message}>{message}</p>}
-      </div>
+      </form>
 
       <div style={styles.filterRow}>
         {CATEGORIES.map((c) => (
@@ -139,9 +153,14 @@ export default function Portfolio() {
         ))}
       </div>
 
-      {filteredItems.length === 0 ? (
+      {listLoading ? (
         <div style={styles.empty}>
-          <ImageIcon size={32} color="#333" />
+          <ImageIcon size={32} color="#5c5c5c" />
+          <p style={styles.emptyText}>Loading portfolio…</p>
+        </div>
+      ) : filteredItems.length === 0 ? (
+        <div style={styles.empty}>
+          <ImageIcon size={32} color="#5c5c5c" />
           <p style={styles.emptyText}>No pieces yet in this category.</p>
         </div>
       ) : (
@@ -154,7 +173,7 @@ export default function Portfolio() {
                   <p style={styles.cardCategory}>{item.category}</p>
                   {item.caption && <p style={styles.cardCaption}>{item.caption}</p>}
                 </div>
-                <button style={styles.deleteButton} onClick={() => handleDelete(item.id)}>
+                <button style={styles.deleteButton} onClick={() => handleDelete(item)}>
                   <Trash2 size={14} color="#8b1a1a" />
                 </button>
               </div>
@@ -169,27 +188,27 @@ export default function Portfolio() {
 const styles = {
   container: { padding: "48px 52px", fontFamily: "'DM Sans', sans-serif", color: "#f5f5f5", minHeight: "100vh", background: "#0a0a0a" },
   header: { marginBottom: "24px" },
-  headerSub: { color: "#444", fontSize: "12px", textTransform: "uppercase", letterSpacing: "1px", margin: "0 0 6px 0" },
+  headerSub: { color: "#6b6b6b", fontSize: "12px", textTransform: "uppercase", letterSpacing: "1px", margin: "0 0 6px 0" },
   headerTitle: { fontFamily: "'Playfair Display', serif", fontSize: "32px", margin: 0, fontWeight: "600" },
   divider: { height: "1px", background: "#1a1a1a", marginBottom: "32px" },
-  uploadSection: { background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "24px", marginBottom: "32px" },
+  uploadSection: { background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "24px", marginBottom: "32px" },
   sectionTitle: { fontFamily: "'Playfair Display', serif", fontSize: "16px", margin: "0 0 16px 0", fontWeight: "400" },
   uploadRow: { display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" },
   fileInput: { color: "#888", fontSize: "13px" },
-  select: { padding: "10px", background: "#111", border: "1px solid #1a1a1a", borderRadius: "8px", color: "#f5f5f5", fontSize: "13px", fontFamily: "'DM Sans', sans-serif" },
-  captionInput: { flex: 1, minWidth: "180px", padding: "10px 14px", background: "#111", border: "1px solid #1a1a1a", borderRadius: "8px", color: "#f5f5f5", fontSize: "13px", outline: "none", fontFamily: "'DM Sans', sans-serif" },
-  button: { display: "flex", alignItems: "center", gap: "6px", padding: "10px 16px", background: "#d4a843", border: "none", borderRadius: "8px", color: "#0a0a0a", fontSize: "13px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
-  message: { color: "#d4a843", fontSize: "13px", marginTop: "12px", marginBottom: 0 },
+  select: { padding: "10px", background: "#141416", border: "1px solid #1a1a1a", borderRadius: "8px", color: "#f5f5f5", fontSize: "13px", fontFamily: "'DM Sans', sans-serif" },
+  captionInput: { flex: 1, minWidth: "180px", padding: "10px 14px", background: "#141416", border: "1px solid #1a1a1a", borderRadius: "8px", color: "#f5f5f5", fontSize: "13px", outline: "none", fontFamily: "'DM Sans', sans-serif" },
+  button: { display: "flex", alignItems: "center", gap: "6px", padding: "10px 16px", background: "#c9974a", border: "none", borderRadius: "8px", color: "#0a0a0a", fontSize: "13px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+  message: { color: "#c9974a", fontSize: "13px", marginTop: "12px", marginBottom: 0 },
   filterRow: { display: "flex", gap: "8px", marginBottom: "24px", flexWrap: "wrap" },
-  filter: { padding: "8px 14px", background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: "20px", color: "#666", fontSize: "12px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
-  filterActive: { padding: "8px 14px", background: "#d4a843", border: "1px solid #d4a843", borderRadius: "20px", color: "#0a0a0a", fontSize: "12px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+  filter: { padding: "8px 14px", background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "20px", color: "#666", fontSize: "12px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+  filterActive: { padding: "8px 14px", background: "#c9974a", border: "1px solid #c9974a", borderRadius: "20px", color: "#0a0a0a", fontSize: "12px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
   grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "20px" },
-  card: { background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: "12px", overflow: "hidden" },
+  card: { background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "12px", overflow: "hidden" },
   image: { width: "100%", height: "220px", objectFit: "cover", display: "block" },
   cardFooter: { padding: "14px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" },
-  cardCategory: { color: "#d4a843", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", margin: "0 0 4px 0" },
+  cardCategory: { color: "#c9974a", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", margin: "0 0 4px 0" },
   cardCaption: { color: "#888", fontSize: "13px", margin: 0 },
   deleteButton: { background: "transparent", border: "none", cursor: "pointer", padding: "4px" },
-  empty: { display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", padding: "60px 0", color: "#444" },
+  empty: { display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", padding: "60px 0", color: "#6b6b6b" },
   emptyText: { fontSize: "14px", margin: 0 },
 }

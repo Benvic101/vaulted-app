@@ -15,14 +15,16 @@ import {
 export default function Dashboard() {
   const [user, setUser] = useState(null)
   const [activePage, setActivePage] = useState("dashboard")
+  const [statsLoading, setStatsLoading] = useState(true)
   const [stats, setStats] = useState({
     totalClients: 0,
     bookingsThisWeek: 0,
     revenueThisMonth: 0,
-    pendingConsents: 0,
+    consentForms: 0,
   })
 
     const fetchStats = async (artistId) => {
+    setStatsLoading(true)
     const { count: clientCount } = await supabase
       .from("clients")
       .select("*", { count: "exact", head: true })
@@ -50,21 +52,28 @@ export default function Dashboard() {
       .from("consent_forms")
       .select("*", { count: "exact", head: true })
       .eq("artist_id", artistId)
+      .gte("signed_at", monthStart.toISOString())
 
     setStats({
       totalClients: clientCount || 0,
       bookingsThisWeek: bookingCount || 0,
       revenueThisMonth: revenue,
-      pendingConsents: consentCount || 0,
+      consentForms: consentCount || 0,
     })
+    setStatsLoading(false)
   }
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setUser(data.user)
-      if (data.user) fetchStats(data.user.id)
     })
   }, [])
+
+  useEffect(() => {
+    if (activePage === "dashboard" && user?.id) {
+      fetchStats(user.id)
+    }
+  }, [activePage, user?.id])
 
 
   const navItems = [
@@ -78,14 +87,14 @@ export default function Dashboard() {
   ]
 
   const statCards = [
-    { label: "Total Clients", value: stats.totalClients, icon: <Users size={20} />, color: "#d4a843" },
-    { label: "Bookings This Week", value: stats.bookingsThisWeek, icon: <CalendarDays size={20} />, color: "#d4a843" },
+    { label: "Total Clients", value: stats.totalClients, icon: <Users size={20} />, color: "#c9974a" },
+    { label: "Bookings This Week", value: stats.bookingsThisWeek, icon: <CalendarDays size={20} />, color: "#c9974a" },
     { label: "Revenue This Month", value: `$${stats.revenueThisMonth.toFixed(2)}`, icon: <TrendingUp size={20} />, color: "#2d6a4f" },
-    { label: "Consent Forms Signed", value: stats.pendingConsents, icon: <FileText size={20} />, color: "#8b1a1a" },
+    { label: "Forms Signed This Month", value: stats.consentForms, icon: <FileText size={20} />, color: "#8b1a1a" },
   ]
 
   const quickActions = [
-    { label: "New Booking", icon: <CalendarDays size={24} />, color: "#d4a843", page: "bookings" },
+    { label: "New Booking", icon: <CalendarDays size={24} />, color: "#c9974a", page: "bookings" },
     { label: "Add Client", icon: <Users size={24} />, color: "#4c9ac9", page: "clients" },
     { label: "Consent Forms", icon: <FileText size={24} />, color: "#8b1a1a", page: "consent forms" },
     { label: "Payments", icon: <CreditCard size={24} />, color: "#2d6a4f", page: "payments" },
@@ -119,9 +128,9 @@ export default function Dashboard() {
                 key={item.label}
                 style={{
                   ...styles.navItem,
-                  background: isActive ? "rgba(212,168,67,0.1)" : "transparent",
-                  borderLeft: isActive ? "2px solid #d4a843" : "2px solid transparent",
-                  color: isActive ? "#d4a843" : "#555",
+                  background: isActive ? "rgba(201,151,74,0.1)" : "transparent",
+                  borderLeft: isActive ? "2px solid #c9974a" : "2px solid transparent",
+                  color: isActive ? "#c9974a" : "#555",
                 }}
                 onClick={() => setActivePage(item.label.toLowerCase())}
               >
@@ -176,7 +185,9 @@ export default function Dashboard() {
                   <div style={{ ...styles.statIconBox, color: stat.color }}>
                     {stat.icon}
                   </div>
-                  <div style={styles.statValue}>{stat.value}</div>
+                  <div style={styles.statValue}>
+                    {statsLoading ? <span style={styles.statValueSkeleton}>—</span> : stat.value}
+                  </div>
                   <div style={styles.statLabel}>{stat.label}</div>
                 </div>
               ))}
@@ -211,22 +222,36 @@ export default function Dashboard() {
 
 function TodayAppointments({ artistId }) {
   const [appointments, setAppointments] = useState([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!artistId) return
+    setLoading(true)
     const today = new Date().toISOString().split("T")[0]
     supabase
       .from("bookings")
       .select("*")
       .eq("artist_id", artistId)
       .eq("date", today)
-      .then(({ data }) => setAppointments(data || []))
+      .then(({ data }) => {
+        setAppointments(data || [])
+        setLoading(false)
+      })
   }, [artistId])
+
+  if (loading) {
+    return (
+      <div style={styles.emptyState}>
+        <CalendarDays size={32} color="#5c5c5c" />
+        <p style={styles.emptyText}>Loading appointments…</p>
+      </div>
+    )
+  }
 
   if (appointments.length === 0) {
     return (
       <div style={styles.emptyState}>
-        <CalendarDays size={32} color="#333" />
+        <CalendarDays size={32} color="#5c5c5c" />
         <p style={styles.emptyText}>No appointments today. Enjoy the rest!</p>
       </div>
     )
@@ -257,7 +282,7 @@ const styles = {
   },
   sidebar: {
     width: "240px",
-    background: "#0d0d0d",
+    background: "#0f0f10",
     borderRight: "1px solid #1a1a1a",
     display: "flex",
     flexDirection: "column",
@@ -273,7 +298,7 @@ const styles = {
     marginBottom: "48px",
   },
   sidebarLogo: {
-    color: "#d4a843",
+    color: "#c9974a",
     fontSize: "20px",
   },
   sidebarTitle: {
@@ -306,7 +331,7 @@ const styles = {
     alignItems: "center",
     gap: "10px",
     padding: "12px 24px",
-    color: "#444",
+    color: "#6b6b6b",
     cursor: "pointer",
     fontSize: "14px",
     borderTop: "1px solid #1a1a1a",
@@ -338,7 +363,7 @@ const styles = {
     textTransform: "capitalize",
   },
   headerDate: {
-    color: "#444",
+    color: "#6b6b6b",
     fontSize: "13px",
     marginTop: "8px",
   },
@@ -354,7 +379,7 @@ const styles = {
     marginBottom: "48px",
   },
   statCard: {
-    background: "#0d0d0d",
+    background: "#0f0f10",
     border: "1px solid #1a1a1a",
     borderRadius: "12px",
     padding: "24px",
@@ -370,7 +395,7 @@ const styles = {
     fontFamily: "'Playfair Display', serif",
   },
   statLabel: {
-    color: "#444",
+    color: "#6b6b6b",
     fontSize: "12px",
     textTransform: "uppercase",
     letterSpacing: "0.5px",
@@ -389,7 +414,7 @@ const styles = {
     marginBottom: "48px",
   },
   actionCard: {
-    background: "#0d0d0d",
+    background: "#0f0f10",
     border: "1px solid #1a1a1a",
     borderRadius: "12px",
     padding: "24px",
@@ -401,7 +426,7 @@ const styles = {
     fontSize: "13px",
   },
   emptyState: {
-    background: "#0d0d0d",
+    background: "#0f0f10",
     border: "1px solid #1a1a1a",
     borderRadius: "12px",
     padding: "48px",
@@ -412,7 +437,7 @@ const styles = {
     gap: "12px",
   },
   emptyText: {
-    color: "#333",
+    color: "#5c5c5c",
     fontSize: "14px",
     margin: 0,
   },
@@ -420,13 +445,13 @@ const styles = {
     display: "flex",
     alignItems: "center",
     gap: "16px",
-    background: "#0d0d0d",
+    background: "#0f0f10",
     border: "1px solid #1a1a1a",
     borderRadius: "12px",
     padding: "16px 20px",
   },
   aptTime: {
-    color: "#d4a843",
+    color: "#c9974a",
     fontSize: "13px",
     fontWeight: "600",
     minWidth: "70px",
@@ -438,7 +463,7 @@ const styles = {
     margin: "0 0 4px 0",
   },
   aptType: {
-    color: "#444",
+    color: "#6b6b6b",
     fontSize: "13px",
     margin: 0,
   },

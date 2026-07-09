@@ -5,7 +5,7 @@ import { Mail, Lock, Palette } from "lucide-react"
 import logo from "./assets/logo.png"
 
 export default function App() {
-  const [session, setSession] = useState(null)
+  const [session, setSession] = useState(undefined)
   const [isLogin, setIsLogin] = useState(true)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -14,7 +14,7 @@ export default function App() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
+      setSession(data.session ?? null)
     })
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
@@ -22,7 +22,8 @@ export default function App() {
     return () => listener.subscription.unsubscribe()
   }, [])
 
-  const handleAuth = async () => {
+  const handleAuth = async (e) => {
+    e?.preventDefault?.()
     setLoading(true)
     setMessage("")
     if (isLogin) {
@@ -34,6 +35,19 @@ export default function App() {
       else setMessage("Account created! Check your email to confirm. ✅")
     }
     setLoading(false)
+  }
+
+  if (session === undefined) {
+    return (
+      <div style={styles.bootGate}>
+        <img
+          src={logo}
+          alt="Vaulted"
+          style={styles.bootLogo}
+        />
+        <span style={styles.bootBrand}>Vaulted</span>
+      </div>
+    )
   }
 
   if (session) return <Dashboard />
@@ -70,49 +84,76 @@ export default function App() {
       </div>
 
       <div style={styles.right}>
-        <div style={styles.card}>
+        <form style={styles.card} onSubmit={handleAuth}>
           <h2 style={styles.cardTitle}>{isLogin ? "Welcome back" : "Create account"}</h2>
           <p style={styles.cardSubtitle}>{isLogin ? "Sign in to your studio" : "Start managing your studio"}</p>
 
           <div style={styles.tabs}>
-            <button style={isLogin ? styles.tabActive : styles.tab} onClick={() => setIsLogin(true)}>Login</button>
-            <button style={!isLogin ? styles.tabActive : styles.tab} onClick={() => setIsLogin(false)}>Sign Up</button>
+            <button type="button" style={isLogin ? styles.tabActive : styles.tab} onClick={() => setIsLogin(true)}>Login</button>
+            <button type="button" style={!isLogin ? styles.tabActive : styles.tab} onClick={() => setIsLogin(false)}>Sign Up</button>
           </div>
 
           <div style={styles.inputWrapper}>
-            <Mail size={16} color="#666" style={styles.inputIcon} />
+            <Mail size={16} color="#6b6b6b" style={styles.inputIcon} />
             <input
               style={styles.input}
               type="email"
               placeholder="Email address"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
             />
           </div>
 
           <div style={styles.inputWrapper}>
-            <Lock size={16} color="#666" style={styles.inputIcon} />
+            <Lock size={16} color="#6b6b6b" style={styles.inputIcon} />
             <input
               style={styles.input}
               type="password"
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              autoComplete={isLogin ? "current-password" : "new-password"}
             />
           </div>
 
-          <button style={styles.button} onClick={handleAuth} disabled={loading}>
+          <button type="submit" style={styles.button} disabled={loading}>
             {loading ? "Please wait..." : isLogin ? "Sign In" : "Create Account"}
           </button>
 
           {message && <p style={styles.message}>{message}</p>}
-        </div>
+        </form>
       </div>
     </div>
   )
 }
 
 const styles = {
+  bootGate: {
+    minHeight: "100vh",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "16px",
+    background: "#0a0a0a",
+    fontFamily: "'DM Sans', sans-serif",
+  },
+  bootLogo: {
+    width: "48px",
+    height: "48px",
+    objectFit: "cover",
+    borderRadius: "50%",
+    border: "1px solid #1e1e1e",
+    opacity: 0.9,
+  },
+  bootBrand: {
+    fontFamily: "'Playfair Display', serif",
+    color: "#f5f5f5",
+    fontSize: "20px",
+    letterSpacing: "1px",
+    opacity: 0.7,
+  },
   container: {
     minHeight: "100vh",
     display: "flex",
@@ -121,7 +162,7 @@ const styles = {
   },
   left: {
     flex: 1,
-    background: "linear-gradient(135deg, #0a0a0a 0%, #111111 100%)",
+    background: "linear-gradient(135deg, #0a0a0a 0%, #141416 100%)",
     borderRight: "1px solid #1e1e1e",
     display: "flex",
     alignItems: "center",
@@ -172,7 +213,7 @@ const styles = {
     width: "6px",
     height: "6px",
     borderRadius: "50%",
-    background: "#d4a843",
+    background: "#c9974a",
     flexShrink: 0,
   },
   featureText: {
@@ -202,7 +243,7 @@ const styles = {
   },
   tabs: {
     display: "flex",
-    background: "#111111",
+    background: "#141416",
     borderRadius: "10px",
     padding: "4px",
     marginBottom: "24px",
@@ -223,7 +264,7 @@ const styles = {
     flex: 1,
     padding: "10px",
     border: "none",
-    background: "#d4a843",
+    background: "#c9974a",
     color: "#0a0a0a",
     cursor: "pointer",
     borderRadius: "8px",
@@ -244,12 +285,11 @@ const styles = {
   input: {
     width: "100%",
     padding: "13px 16px 13px 42px",
-    background: "#111111",
+    background: "#141416",
     border: "1px solid #1e1e1e",
     borderRadius: "10px",
     color: "#f5f5f5",
     fontSize: "15px",
-    outline: "none",
     boxSizing: "border-box",
     fontFamily: "'DM Sans', sans-serif",
   },
@@ -257,7 +297,7 @@ const styles = {
     width: "100%",
     padding: "14px",
     marginTop: "8px",
-    background: "#d4a843",
+    background: "#c9974a",
     border: "none",
     borderRadius: "10px",
     color: "#0a0a0a",
@@ -269,7 +309,7 @@ const styles = {
   },
   message: {
     marginTop: "16px",
-    color: "#d4a843",
+    color: "#c9974a",
     fontSize: "13px",
     textAlign: "center",
   },

@@ -109,3 +109,23 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
+
+button:focus,
+input:focus,
+select:focus,
+textarea:focus,
+a:focus,
+[role="button"]:focus {
+  outline: none;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
+  outline: 1px solid rgba(201, 151, 74, 0.6);
+  outline-offset: 2px;
+  border-radius: 8px;
+}

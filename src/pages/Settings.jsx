@@ -78,14 +78,14 @@ useEffect(() => {
 
       <div style={styles.divider} />
 
-      <div style={styles.form}>
+      <form style={styles.form} onSubmit={(e) => { e.preventDefault(); handleSave() }}>
         <div style={styles.section}>
           <h3 style={styles.sectionTitle}>Studio Information</h3>
 
           <div style={styles.field}>
             <label style={styles.label}>Studio Name</label>
             <div style={styles.inputWrapper}>
-              <Building size={15} color="#444" style={styles.inputIcon} />
+              <Building size={15} color="#6b6b6b" style={styles.inputIcon} />
               <input style={styles.input} name="studio_name" placeholder="e.g. Vaulted Tattoo Studio" value={form.studio_name} onChange={handleChange} />
             </div>
           </div>
@@ -93,7 +93,7 @@ useEffect(() => {
           <div style={styles.field}>
             <label style={styles.label}>Artist Full Name</label>
             <div style={styles.inputWrapper}>
-              <User size={15} color="#444" style={styles.inputIcon} />
+              <User size={15} color="#6b6b6b" style={styles.inputIcon} />
               <input style={styles.input} name="full_name" placeholder="Your full name" value={form.full_name} onChange={handleChange} />
             </div>
           </div>
@@ -101,7 +101,7 @@ useEffect(() => {
           <div style={styles.field}>
             <label style={styles.label}>Email</label>
             <div style={styles.inputWrapper}>
-              <Mail size={15} color="#444" style={styles.inputIcon} />
+              <Mail size={15} color="#6b6b6b" style={styles.inputIcon} />
               <input style={{ ...styles.input, opacity: 0.5 }} value={form.email} disabled />
             </div>
           </div>
@@ -125,12 +125,12 @@ useEffect(() => {
           </div>
         </div>
 
-        <button style={styles.button} onClick={handleSave} disabled={loading}>
+        <button type="submit" style={styles.button} disabled={loading}>
           <Save size={16} /> {loading ? "Saving..." : "Save Changes"}
         </button>
 
         {message && <p style={styles.message}>{message}</p>}
-      </div>
+      </form>
     </div>
   )
 }
@@ -138,17 +138,17 @@ useEffect(() => {
 const styles = {
   container: { padding: "48px 52px", fontFamily: "'DM Sans', sans-serif", color: "#f5f5f5", minHeight: "100vh", background: "#0a0a0a" },
   header: { marginBottom: "24px" },
-  headerSub: { color: "#444", fontSize: "12px", textTransform: "uppercase", letterSpacing: "1px", margin: "0 0 6px 0" },
+  headerSub: { color: "#6b6b6b", fontSize: "12px", textTransform: "uppercase", letterSpacing: "1px", margin: "0 0 6px 0" },
   headerTitle: { fontFamily: "'Playfair Display', serif", fontSize: "32px", margin: 0, fontWeight: "600" },
   divider: { height: "1px", background: "#1a1a1a", marginBottom: "40px" },
   form: { display: "flex", flexDirection: "column", gap: "24px", maxWidth: "600px" },
-  section: { background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "24px", display: "flex", flexDirection: "column", gap: "16px" },
+  section: { background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "24px", display: "flex", flexDirection: "column", gap: "16px" },
   sectionTitle: { fontFamily: "'Playfair Display', serif", color: "#f5f5f5", fontSize: "16px", margin: 0, fontWeight: "400" },
   field: { display: "flex", flexDirection: "column", gap: "8px" },
   label: { fontSize: "12px", color: "#555", textTransform: "uppercase", letterSpacing: "0.5px" },
   inputWrapper: { position: "relative" },
   inputIcon: { position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" },
-  input: { width: "100%", padding: "12px 16px 12px 40px", background: "#111", border: "1px solid #1a1a1a", borderRadius: "8px", color: "#f5f5f5", fontSize: "14px", outline: "none", boxSizing: "border-box", fontFamily: "'DM Sans', sans-serif" },
-  button: { display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", padding: "13px", background: "#d4a843", border: "none", borderRadius: "8px", color: "#0a0a0a", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
-  message: { color: "#d4a843", fontSize: "13px", textAlign: "center", margin: 0 },
+  input: { width: "100%", padding: "12px 16px 12px 40px", background: "#141416", border: "1px solid #1a1a1a", borderRadius: "8px", color: "#f5f5f5", fontSize: "14px", outline: "none", boxSizing: "border-box", fontFamily: "'DM Sans', sans-serif" },
+  button: { display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", padding: "13px", background: "#c9974a", border: "none", borderRadius: "8px", color: "#0a0a0a", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+  message: { color: "#c9974a", fontSize: "13px", textAlign: "center", margin: 0 },
 }

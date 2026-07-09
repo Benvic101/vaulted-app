@@ -6,6 +6,7 @@ export default function Payments() {
   const [view, setView] = useState("list")
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(false)
+  const [listLoading, setListLoading] = useState(true)
   const [message, setMessage] = useState("")
   const [form, setForm] = useState({
     client_name: "", amount: "", type: "deposit", method: "cash", notes: "",
@@ -14,12 +15,14 @@ export default function Payments() {
   useEffect(() => { fetchPayments() }, [])
 
   const fetchPayments = async () => {
+    setListLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
     const { data, error } = await supabase
       .from("payments")
       .select("*")
       .eq("artist_id", user.id)
     if (!error) setPayments(data)
+    setListLoading(false)
   }
 
   const handleChange = (e) => {
@@ -56,17 +59,17 @@ export default function Payments() {
   const totalFinal = payments.filter(p => p.type === "final").reduce((sum, p) => sum + parseFloat(p.amount || 0), 0)
 
   const getMethodIcon = (method) => {
-    if (method === "cash") return <Wallet size={18} color="#d4a843" />
+    if (method === "cash") return <Wallet size={18} color="#c9974a" />
     if (method === "card") return <CreditCard size={18} color="#4c9ac9" />
     if (method === "transfer") return <Receipt size={18} color="#2d6a4f" />
-    return <DollarSign size={18} color="#d4a843" />
+    return <DollarSign size={18} color="#c9974a" />
   }
 
   const getTypeColor = (type) => {
-    if (type === "deposit") return "#d4a843"
+    if (type === "deposit") return "#c9974a"
     if (type === "final") return "#2d6a4f"
     if (type === "tip") return "#4c9ac9"
-    return "#d4a843"
+    return "#c9974a"
   }
 
   return (
@@ -93,14 +96,14 @@ export default function Payments() {
       {view === "list" && (
         <div style={styles.summaryGrid}>
           <div style={styles.summaryCard}>
-            <div style={styles.summaryIcon}><TrendingUp size={18} color="#d4a843" /></div>
+            <div style={styles.summaryIcon}><TrendingUp size={18} color="#c9974a" /></div>
             <p style={styles.summaryLabel}>Total Revenue</p>
             <p style={styles.summaryValue}>${totalRevenue.toFixed(2)}</p>
           </div>
           <div style={styles.summaryCard}>
-            <div style={styles.summaryIcon}><Wallet size={18} color="#d4a843" /></div>
+            <div style={styles.summaryIcon}><Wallet size={18} color="#c9974a" /></div>
             <p style={styles.summaryLabel}>Total Deposits</p>
-            <p style={{ ...styles.summaryValue, color: "#d4a843" }}>${totalDeposits.toFixed(2)}</p>
+            <p style={{ ...styles.summaryValue, color: "#c9974a" }}>${totalDeposits.toFixed(2)}</p>
           </div>
           <div style={styles.summaryCard}>
             <div style={styles.summaryIcon}><CreditCard size={18} color="#2d6a4f" /></div>
@@ -117,18 +120,18 @@ export default function Payments() {
 
       {/* Form */}
       {view === "form" && (
-        <div style={styles.form}>
+        <form style={styles.form} onSubmit={(e) => { e.preventDefault(); handleSubmit() }}>
           <div style={styles.field}>
             <label style={styles.label}>Client Name *</label>
             <div style={styles.inputWrapper}>
-              <User size={15} color="#444" style={styles.inputIcon} />
+              <User size={15} color="#6b6b6b" style={styles.inputIcon} />
               <input style={styles.input} name="client_name" placeholder="e.g. John Smith" value={form.client_name} onChange={handleChange} />
             </div>
           </div>
           <div style={styles.field}>
             <label style={styles.label}>Amount ($) *</label>
             <div style={styles.inputWrapper}>
-              <DollarSign size={15} color="#444" style={styles.inputIcon} />
+              <DollarSign size={15} color="#6b6b6b" style={styles.inputIcon} />
               <input style={styles.input} name="amount" type="number" placeholder="e.g. 150" value={form.amount} onChange={handleChange} />
             </div>
           </div>
@@ -155,17 +158,22 @@ export default function Payments() {
             <label style={styles.label}>Notes</label>
             <input style={{ ...styles.input, paddingLeft: "16px" }} name="notes" placeholder="Any additional notes..." value={form.notes} onChange={handleChange} />
           </div>
-          <button style={styles.button} onClick={handleSubmit} disabled={loading}>
+          <button type="submit" style={styles.button} disabled={loading}>
             {loading ? "Saving..." : "Record Payment"}
           </button>
           {message && <p style={styles.message}>{message}</p>}
-        </div>
+        </form>
       )}
 
       {/* List */}
       {view === "list" && (
         <div style={styles.paymentsList}>
-          {payments.length === 0 ? (
+          {listLoading ? (
+            <div style={styles.emptyState}>
+              <CreditCard size={36} color="#5c5c5c" />
+              <p style={styles.emptyText}>Loading payments…</p>
+            </div>
+          ) : payments.length === 0 ? (
             <div style={styles.emptyState}>
               <CreditCard size={36} color="#222" />
               <p style={styles.emptyText}>No payments recorded yet.</p>
@@ -208,14 +216,14 @@ export default function Payments() {
 const styles = {
   container: { padding: "48px 52px", fontFamily: "'DM Sans', sans-serif", color: "#f5f5f5", minHeight: "100vh", background: "#0a0a0a" },
   header: { display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "24px" },
-  headerSub: { color: "#444", fontSize: "12px", textTransform: "uppercase", letterSpacing: "1px", margin: "0 0 6px 0" },
+  headerSub: { color: "#6b6b6b", fontSize: "12px", textTransform: "uppercase", letterSpacing: "1px", margin: "0 0 6px 0" },
   headerTitle: { fontFamily: "'Playfair Display', serif", fontSize: "32px", margin: 0, fontWeight: "600" },
-  newBtn: { display: "flex", alignItems: "center", gap: "8px", padding: "10px 20px", background: "#d4a843", border: "none", borderRadius: "8px", color: "#0a0a0a", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+  newBtn: { display: "flex", alignItems: "center", gap: "8px", padding: "10px 20px", background: "#c9974a", border: "none", borderRadius: "8px", color: "#0a0a0a", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
   divider: { height: "1px", background: "#1a1a1a", marginBottom: "40px" },
   summaryGrid: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px", marginBottom: "32px" },
-  summaryCard: { background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "20px 24px" },
+  summaryCard: { background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "20px 24px" },
   summaryIcon: { marginBottom: "12px" },
-  summaryLabel: { color: "#444", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", margin: "0 0 8px 0" },
+  summaryLabel: { color: "#6b6b6b", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", margin: "0 0 8px 0" },
   summaryValue: { color: "#f5f5f5", fontSize: "24px", fontWeight: "600", margin: 0, fontFamily: "'Playfair Display', serif" },
   form: { display: "flex", flexDirection: "column", gap: "20px", maxWidth: "700px" },
   formGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" },
@@ -223,19 +231,19 @@ const styles = {
   label: { fontSize: "12px", color: "#555", textTransform: "uppercase", letterSpacing: "0.5px" },
   inputWrapper: { position: "relative" },
   inputIcon: { position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" },
-  input: { width: "100%", padding: "12px 16px 12px 40px", background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: "8px", color: "#f5f5f5", fontSize: "14px", outline: "none", boxSizing: "border-box", fontFamily: "'DM Sans', sans-serif" },
-  button: { padding: "13px", background: "#d4a843", border: "none", borderRadius: "8px", color: "#0a0a0a", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
-  message: { color: "#d4a843", fontSize: "13px", textAlign: "center", margin: 0 },
+  input: { width: "100%", padding: "12px 16px 12px 40px", background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "8px", color: "#f5f5f5", fontSize: "14px", outline: "none", boxSizing: "border-box", fontFamily: "'DM Sans', sans-serif" },
+  button: { padding: "13px", background: "#c9974a", border: "none", borderRadius: "8px", color: "#0a0a0a", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+  message: { color: "#c9974a", fontSize: "13px", textAlign: "center", margin: 0 },
   paymentsList: { display: "flex", flexDirection: "column", gap: "12px" },
-  paymentCard: { display: "flex", alignItems: "center", gap: "20px", background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "20px 24px" },
-  paymentIconBox: { width: "44px", height: "44px", borderRadius: "10px", background: "#111", border: "1px solid #1a1a1a", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  paymentCard: { display: "flex", alignItems: "center", gap: "20px", background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "20px 24px" },
+  paymentIconBox: { width: "44px", height: "44px", borderRadius: "10px", background: "#141416", border: "1px solid #1a1a1a", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
   paymentInfo: { flex: 1 },
   paymentName: { color: "#f5f5f5", fontSize: "16px", margin: "0 0 4px 0", fontWeight: "500" },
-  paymentNote: { color: "#444", fontSize: "13px", margin: 0 },
+  paymentNote: { color: "#6b6b6b", fontSize: "13px", margin: 0 },
   paymentRight: { textAlign: "right" },
   typeBadge: { display: "inline-block", padding: "3px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" },
   paymentAmount: { color: "#f5f5f5", fontSize: "20px", fontWeight: "600", margin: "0 0 2px 0", fontFamily: "'Playfair Display', serif" },
-  paymentDate: { color: "#444", fontSize: "12px", margin: 0 },
-  emptyState: { background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "60px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "16px" },
-  emptyText: { color: "#333", fontSize: "14px", margin: 0 },
+  paymentDate: { color: "#6b6b6b", fontSize: "12px", margin: 0 },
+  emptyState: { background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "60px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "16px" },
+  emptyText: { color: "#5c5c5c", fontSize: "14px", margin: 0 },
 }
