@@ -55,11 +55,6 @@ body {
 }
 
 #root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
   min-height: 100svh;
   display: flex;
   flex-direction: column;
@@ -128,4 +123,408 @@ a:focus-visible,
   outline: 1px solid rgba(201, 151, 74, 0.6);
   outline-offset: 2px;
   border-radius: 8px;
+}
+
+/* ==========================================================================
+   Vaulted responsive foundation (Mission 7)
+
+   Breakpoints:
+     Mobile:  <= 767px
+     Tablet:  768px - 1023px
+     Desktop: >= 1024px
+
+   768px is the iPad-portrait width, a real device boundary comfortably
+   above every phone in the "large phone" category (iPhone Pro Max ~430px,
+   large Android ~480px) — no phone gets miscategorized as tablet.
+   1024px is iPad-landscape width, the point a permanent sidebar + dense
+   multi-column layout stops feeling cramped.
+
+   These classes only ever set layout-affecting properties (display, width,
+   margin, transform, position). Color, spacing, typography and every other
+   visual property stay owned by each component's inline style objects, so
+   there's no specificity conflict between className and style on the same
+   element.
+   ========================================================================== */
+
+/* Viewport-safe full-height helper — 100dvh (where supported) avoids the
+   mobile-Safari bug where 100vh overflows the actually-visible viewport
+   when browser chrome collapses/expands, e.g. on rotation to landscape. */
+.vlt-full-height {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* ---- Adaptive navigation shell ----
+   Desktop: permanent 240px sidebar (default rules below).
+   Tablet: collapses to a 72px icon-only rail, always visible.
+   Mobile: becomes an off-canvas drawer, hidden by default, toggled via
+   the hamburger button in the mobile top bar. The open/closed transform
+   and the mobile top bar/overlay are scoped entirely inside the mobile
+   media query, so drawer state has zero visual effect at wider
+   breakpoints — no resize listener is needed to "reset" anything when
+   the viewport crosses a breakpoint. */
+
+.vlt-sidebar {
+  width: 240px;
+  height: 100vh;
+  height: 100dvh;
+}
+
+.vlt-main {
+  margin-left: 240px;
+}
+
+.vlt-mobile-topbar {
+  display: none;
+}
+
+.vlt-drawer-overlay {
+  display: none;
+}
+
+.vlt-mobile-topbar-spacer {
+  display: none;
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .vlt-sidebar {
+    width: 72px;
+  }
+
+  .vlt-sidebar-label {
+    display: none;
+  }
+
+  .vlt-main {
+    margin-left: 72px;
+  }
+}
+
+@media (max-width: 767px) {
+  .vlt-sidebar {
+    width: 240px;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+  }
+
+  .vlt-sidebar.vlt-sidebar-open {
+    transform: translateX(0);
+  }
+
+  .vlt-main {
+    margin-left: 0;
+  }
+
+  .vlt-mobile-topbar {
+    display: flex;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    z-index: 30;
+  }
+
+  .vlt-mobile-topbar-spacer {
+    display: block;
+    height: 56px;
+  }
+
+  .vlt-drawer-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 35;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+
+  .vlt-drawer-overlay.vlt-drawer-overlay-visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* ---- Dashboard content (Mission 7, Stage 2) ----
+   Header stacks vertically on mobile so a long date string doesn't cramp
+   against the greeting instead of wrapping/overlapping.
+   KPI grid: 4 desktop -> 2 tablet -> 1 mobile (informational, safe to stack).
+   Action grid: 4 desktop -> 2 tablet -> 2 mobile (primary tap targets,
+   kept at a minimum of 2 columns at every size so they stay reachable
+   near the top of the screen rather than stretching into a long column).
+   Reordering: on mobile, Today's Appointments moves above Quick Actions
+   and the KPI cards — "what's happening today" is the highest-value
+   glance for an artist checking their phone between clients. Desktop/
+   tablet keep the original order (dense overview first). Achieved with
+   flex `order` on an otherwise unchanged flex-column wrapper — no
+   duplicated markup, no JS. */
+
+.vlt-dashboard-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.vlt-order-stats {
+  order: 1;
+}
+
+.vlt-order-actions {
+  order: 2;
+}
+
+.vlt-order-appointments {
+  order: 3;
+}
+
+.vlt-kpi-grid {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.vlt-action-grid {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .vlt-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .vlt-action-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 767px) {
+  .vlt-dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .vlt-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .vlt-action-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .vlt-order-appointments {
+    order: 1;
+  }
+
+  .vlt-order-actions {
+    order: 2;
+  }
+
+  .vlt-order-stats {
+    order: 3;
+  }
+}
+
+/* ---- List/form pages (Mission 7, Stage 3) ----
+   Applies to Bookings, Clients, ClientDetail, Payments, ConsentForms,
+   Portfolio, Settings.
+
+   .vlt-page-shell: every page's outer container had identical
+   `padding: 48px 52px` + `minHeight: 100vh` inline. Both become
+   breakpoint/viewport-unit concerns (padding shrinks on narrower
+   screens; height gets the dvh-safe treatment from Stage 1), so both
+   move here instead of staying hardcoded per page.
+
+   .vlt-form-grid: the 2-up field grid used by every form. 1 column
+   below tablet so fields never get too narrow to comfortably type in.
+
+   .vlt-card-row / .vlt-card-right / .vlt-card-actions: the repeated
+   list-row card shape (date/avatar box + info + right-aligned meta +
+   edit/delete actions) used by Bookings, Clients, Payments,
+   ConsentForms and ClientDetail. On mobile the row stacks vertically
+   instead of squeezing 3-4 blocks into ~340px of usable width, the
+   right-aligned meta block becomes left-aligned to match, and the
+   actions column becomes a row sitting below the content instead of a
+   vertical pair floated to the right of a now-full-width card.
+
+   .vlt-icon-btn: the plain edit/delete icon button shared by Bookings/
+   Clients/Payments — 6px padding around a 14px icon is ~26px, well
+   under the ~44px touch-target guideline. Bumped on tablet/mobile only;
+   desktop keeps today's tighter, information-dense sizing. */
+
+.vlt-page-shell {
+  padding: 48px 52px;
+  min-height: 100vh;
+  min-height: 100dvh;
+  box-sizing: border-box;
+}
+
+.vlt-form-grid {
+  grid-template-columns: 1fr 1fr;
+}
+
+.vlt-card-row {
+  align-items: center;
+}
+
+.vlt-card-right {
+  text-align: right;
+}
+
+.vlt-card-actions {
+  flex-direction: column;
+  margin-left: 8px;
+}
+
+.vlt-icon-btn {
+  padding: 6px;
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .vlt-page-shell {
+    padding: 40px 32px;
+  }
+
+  .vlt-icon-btn {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 767px) {
+  .vlt-page-shell {
+    padding: 28px 20px;
+  }
+
+  .vlt-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .vlt-card-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .vlt-card-right {
+    text-align: left;
+  }
+
+  .vlt-card-actions {
+    flex-direction: row;
+    margin-left: 0;
+    margin-top: 8px;
+  }
+
+  .vlt-icon-btn {
+    padding: 12px;
+  }
+}
+
+.vlt-summary-grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* .vlt-header-row: shared "title block + action button(s)" header shape
+   (ClientDetail, ConsentForms). align-items is owned here, not inline, so
+   it can legitimately differ per breakpoint (desktop keeps flex-end for
+   pages where that's the intended baseline alignment; mobile always
+   switches to flex-start once the row stacks into a column, where
+   flex-end would right-align the stacked title/buttons). */
+.vlt-header-row {
+  align-items: flex-end;
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .vlt-summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 767px) {
+  .vlt-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .vlt-header-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+}
+
+/* ---- Standalone pages (Mission 7, Stage 4) ----
+   Applies to App.jsx's auth screen and SignConsentForm.jsx — neither
+   lives inside the dashboard shell, so neither uses .vlt-page-shell.
+
+   .vlt-auth-left / .vlt-auth-right: the login screen's marketing-copy
+   split. The left panel is decorative only (tagline + feature bullets,
+   no interactive element), so below desktop it's hidden rather than
+   reflowed — there isn't room at tablet width for a legible marketing
+   column next to a usable 480px form column, and the form is what
+   actually matters once someone is here to sign in. Tablet and mobile
+   share one boundary (1023px) since both genuinely want the same
+   "panel gone, form full-width" state — unlike the sidebar rail, there's
+   no useful intermediate tablet-only layout here.
+
+   .vlt-sign-card: SignConsentForm's outer card padding. 40px reads fine
+   at desktop where the card sits inside a wide centered viewport, but
+   the same 40px eats into content width unnecessarily on a phone —
+   shrinks in two steps, same shape as .vlt-page-shell's padding scale.
+
+   .vlt-sign-page: SignConsentForm's outer page padding, same scale.
+
+   .vlt-auth-brand-mobile: once .vlt-auth-left (the only place the logo/
+   wordmark live) is hidden below 1024px, the auth screen would carry no
+   Vaulted branding at all — a real trust/premium-feel regression on the
+   exact screen a new user's impression is formed on. Hidden by default
+   (desktop already has branding via the left panel) and only shown once
+   the left panel disappears. */
+
+.vlt-auth-left {
+  display: flex;
+}
+
+.vlt-auth-right {
+  width: 480px;
+}
+
+.vlt-sign-card {
+  padding: 40px;
+}
+
+.vlt-sign-page {
+  padding: 48px 20px;
+}
+
+.vlt-auth-brand-mobile {
+  display: none;
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .vlt-sign-card {
+    padding: 32px;
+  }
+}
+
+@media (max-width: 1023px) {
+  .vlt-auth-left {
+    display: none;
+  }
+
+  .vlt-auth-right {
+    width: 100%;
+  }
+
+  .vlt-auth-brand-mobile {
+    display: flex;
+  }
+}
+
+@media (max-width: 767px) {
+  .vlt-sign-card {
+    padding: 24px;
+  }
+
+  .vlt-sign-page {
+    padding: 28px 16px;
+  }
 }

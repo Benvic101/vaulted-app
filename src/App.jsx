@@ -39,7 +39,7 @@ export default function App() {
 
   if (session === undefined) {
     return (
-      <div style={styles.bootGate}>
+      <div style={styles.bootGate} className="vlt-full-height">
         <img
           src={logo}
           alt="Vaulted"
@@ -53,8 +53,8 @@ export default function App() {
   if (session) return <Dashboard />
 
   return (
-    <div style={styles.container}>
-      <div style={styles.left}>
+    <div style={styles.container} className="vlt-full-height">
+      <div style={styles.left} className="vlt-auth-left">
         <div style={styles.leftContent}>
           <div style={styles.brandRow}>
             <img
@@ -83,8 +83,12 @@ export default function App() {
         </div>
       </div>
 
-      <div style={styles.right}>
+      <div style={styles.right} className="vlt-auth-right">
         <form style={styles.card} onSubmit={handleAuth}>
+          <div style={styles.mobileBrandRow} className="vlt-auth-brand-mobile">
+            <img src={logo} alt="Vaulted" style={styles.mobileBrandLogo} />
+            <span style={styles.mobileBrandName}>Vaulted</span>
+          </div>
           <h2 style={styles.cardTitle}>{isLogin ? "Welcome back" : "Create account"}</h2>
           <p style={styles.cardSubtitle}>{isLogin ? "Sign in to your studio" : "Start managing your studio"}</p>
 
@@ -130,7 +134,6 @@ export default function App() {
 
 const styles = {
   bootGate: {
-    minHeight: "100vh",
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
@@ -155,7 +158,6 @@ const styles = {
     opacity: 0.7,
   },
   container: {
-    minHeight: "100vh",
     display: "flex",
     background: "#0a0a0a",
     fontFamily: "'DM Sans', sans-serif",
@@ -164,7 +166,6 @@ const styles = {
     flex: 1,
     background: "linear-gradient(135deg, #0a0a0a 0%, #141416 100%)",
     borderRight: "1px solid #1e1e1e",
-    display: "flex",
     alignItems: "center",
     justifyContent: "center",
     padding: "60px",
@@ -221,14 +222,33 @@ const styles = {
     fontSize: "15px",
   },
   right: {
-    width: "480px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     padding: "60px 40px",
+    boxSizing: "border-box",
   },
   card: {
     width: "100%",
+    maxWidth: "400px",
+  },
+  mobileBrandRow: {
+    alignItems: "center",
+    gap: "10px",
+    marginBottom: "32px",
+  },
+  mobileBrandLogo: {
+    width: "32px",
+    height: "32px",
+    objectFit: "cover",
+    borderRadius: "50%",
+    border: "1px solid #1e1e1e",
+  },
+  mobileBrandName: {
+    fontFamily: "'Playfair Display', serif",
+    color: "#f5f5f5",
+    fontSize: "20px",
+    letterSpacing: "1px",
   },
   cardTitle: {
     fontFamily: "'Playfair Display', serif",
@@ -289,7 +309,7 @@ const styles = {
     border: "1px solid #1e1e1e",
     borderRadius: "10px",
     color: "#f5f5f5",
-    fontSize: "15px",
+    fontSize: "16px",
     boxSizing: "border-box",
     fontFamily: "'DM Sans', sans-serif",
   },

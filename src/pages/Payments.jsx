@@ -1,6 +1,10 @@
 import { useState, useEffect } from "react"
 import { supabase } from "../supabase"
-import { CreditCard, User, DollarSign, Plus, ArrowLeft, TrendingUp, Wallet, Receipt } from "lucide-react"
+import { CreditCard, User, DollarSign, Plus, ArrowLeft, TrendingUp, Wallet, Receipt, Pencil, Trash2 } from "lucide-react"
+import ClientPicker from "../components/ClientPicker"
+import * as layout from "../styles/layout"
+
+const emptyForm = { client_id: null, client_name: "", amount: "", type: "deposit", method: "cash", notes: "" }
 
 export default function Payments() {
   const [view, setView] = useState("list")
@@ -8,9 +12,8 @@ export default function Payments() {
   const [loading, setLoading] = useState(false)
   const [listLoading, setListLoading] = useState(true)
   const [message, setMessage] = useState("")
-  const [form, setForm] = useState({
-    client_name: "", amount: "", type: "deposit", method: "cash", notes: "",
-  })
+  const [editingId, setEditingId] = useState(null)
+  const [form, setForm] = useState(emptyForm)
 
   useEffect(() => { fetchPayments() }, [])
 
@@ -29,6 +32,56 @@ export default function Payments() {
     setForm({ ...form, [e.target.name]: e.target.value })
   }
 
+  const openNew = () => {
+    setEditingId(null)
+    setForm(emptyForm)
+    setMessage("")
+    setView("form")
+  }
+
+  const backToList = () => {
+    setEditingId(null)
+    setForm(emptyForm)
+    setMessage("")
+    setView("list")
+  }
+
+  const openEdit = (payment) => {
+    setEditingId(payment.id)
+    setForm({
+      client_id: payment.client_id ?? null,
+      client_name: payment.client_name ?? "",
+      amount: payment.amount != null ? String(payment.amount) : "",
+      type: payment.type ?? "deposit",
+      method: payment.method ?? "cash",
+      notes: payment.notes ?? "",
+    })
+    setMessage("")
+    setView("form")
+  }
+
+  const handleDelete = async (payment) => {
+    if (!window.confirm(`Delete payment of $${parseFloat(payment.amount || 0).toFixed(2)} from ${payment.client_name}? This cannot be undone.`)) return
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data, error } = await supabase
+      .from("payments")
+      .delete()
+      .eq("id", payment.id)
+      .eq("artist_id", user.id)
+      .select()
+    if (error) {
+      console.error("Payment delete error:", error)
+      setMessage("Delete error: " + error.message)
+      return
+    }
+    if (!data || data.length === 0) {
+      console.error("Payment delete affected 0 rows", { id: payment.id, artist_id: user.id })
+      setMessage("Delete failed — no matching row (check DELETE RLS policy).")
+      return
+    }
+    setPayments((prev) => prev.filter((p) => p.id !== payment.id))
+  }
+
   const handleSubmit = async () => {
     if (!form.client_name || !form.amount) {
       setMessage("Please fill in client name and amount.")
@@ -37,19 +90,47 @@ export default function Payments() {
     setLoading(true)
     setMessage("")
     const { data: { user } } = await supabase.auth.getUser()
-    const { error } = await supabase.from("payments").insert([{
-      ...form,
-      amount: parseFloat(form.amount),
-      artist_id: user.id,
-      paid_at: new Date().toISOString(),
-    }])
-    if (error) {
-      setMessage("Error: " + error.message)
+
+    if (editingId != null) {
+      const { data, error } = await supabase
+        .from("payments")
+        .update({
+          client_id: form.client_id,
+          client_name: form.client_name,
+          amount: parseFloat(form.amount),
+          type: form.type,
+          method: form.method,
+          notes: form.notes,
+        })
+        .eq("id", editingId)
+        .eq("artist_id", user.id)
+        .select()
+      if (error) {
+        console.error("Payment update error:", error)
+        setMessage("Error: " + error.message)
+      } else if (!data || data.length === 0) {
+        console.error("Payment update affected 0 rows", { editingId, artist_id: user.id })
+        setMessage("Update failed — no matching row (check UPDATE RLS policy).")
+      } else {
+        setMessage("Payment updated!")
+        fetchPayments()
+        setTimeout(() => backToList(), 1500)
+      }
     } else {
-      setMessage("Payment recorded!")
-      setForm({ client_name: "", amount: "", type: "deposit", method: "cash", notes: "" })
-      fetchPayments()
-      setTimeout(() => setView("list"), 1500)
+      const { error } = await supabase.from("payments").insert([{
+        ...form,
+        amount: parseFloat(form.amount),
+        artist_id: user.id,
+        paid_at: new Date().toISOString(),
+      }])
+      if (error) {
+        setMessage("Error: " + error.message)
+      } else {
+        setMessage("Payment recorded!")
+        setForm(emptyForm)
+        fetchPayments()
+        setTimeout(() => backToList(), 1500)
+      }
     }
     setLoading(false)
   }
@@ -73,7 +154,7 @@ export default function Payments() {
   }
 
   return (
-    <div style={styles.container}>
+    <div style={styles.container} className="vlt-page-shell">
       <div style={styles.header}>
         <div>
           <p style={styles.headerSub}>Track your revenue and transactions</p>
@@ -81,7 +162,7 @@ export default function Payments() {
         </div>
         <button
           style={styles.newBtn}
-          onClick={() => setView(view === "list" ? "form" : "list")}
+          onClick={() => (view === "list" ? openNew() : backToList())}
         >
           {view === "list"
             ? <><Plus size={16} /> Record Payment</>
@@ -94,7 +175,7 @@ export default function Payments() {
 
       {/* Summary Cards */}
       {view === "list" && (
-        <div style={styles.summaryGrid}>
+        <div style={styles.summaryGrid} className="vlt-kpi-grid">
           <div style={styles.summaryCard}>
             <div style={styles.summaryIcon}><TrendingUp size={18} color="#c9974a" /></div>
             <p style={styles.summaryLabel}>Total Revenue</p>
@@ -122,11 +203,15 @@ export default function Payments() {
       {view === "form" && (
         <form style={styles.form} onSubmit={(e) => { e.preventDefault(); handleSubmit() }}>
           <div style={styles.field}>
-            <label style={styles.label}>Client Name *</label>
-            <div style={styles.inputWrapper}>
-              <User size={15} color="#6b6b6b" style={styles.inputIcon} />
-              <input style={styles.input} name="client_name" placeholder="e.g. John Smith" value={form.client_name} onChange={handleChange} />
-            </div>
+            <label style={styles.label}>Client *</label>
+            <ClientPicker
+              value={form.client_id ? { id: form.client_id, name: form.client_name } : null}
+              onChange={(c) => setForm((f) => ({
+                ...f,
+                client_id: c?.id ?? null,
+                client_name: c?.name ?? "",
+              }))}
+            />
           </div>
           <div style={styles.field}>
             <label style={styles.label}>Amount ($) *</label>
@@ -135,7 +220,7 @@ export default function Payments() {
               <input style={styles.input} name="amount" type="number" placeholder="e.g. 150" value={form.amount} onChange={handleChange} />
             </div>
           </div>
-          <div style={styles.formGrid}>
+          <div style={styles.formGrid} className="vlt-form-grid">
             <div style={styles.field}>
               <label style={styles.label}>Payment Type</label>
               <select style={{ ...styles.input, paddingLeft: "16px" }} name="type" value={form.type} onChange={handleChange}>
@@ -159,7 +244,7 @@ export default function Payments() {
             <input style={{ ...styles.input, paddingLeft: "16px" }} name="notes" placeholder="Any additional notes..." value={form.notes} onChange={handleChange} />
           </div>
           <button type="submit" style={styles.button} disabled={loading}>
-            {loading ? "Saving..." : "Record Payment"}
+            {loading ? "Saving..." : editingId ? "Save Changes" : "Record Payment"}
           </button>
           {message && <p style={styles.message}>{message}</p>}
         </form>
@@ -168,6 +253,7 @@ export default function Payments() {
       {/* List */}
       {view === "list" && (
         <div style={styles.paymentsList}>
+          {message && <p style={{ ...styles.message, textAlign: "left" }}>{message}</p>}
           {listLoading ? (
             <div style={styles.emptyState}>
               <CreditCard size={36} color="#5c5c5c" />
@@ -180,7 +266,7 @@ export default function Payments() {
             </div>
           ) : (
             payments.map((payment) => (
-              <div key={payment.id} style={styles.paymentCard}>
+              <div key={payment.id} style={styles.paymentCard} className="vlt-card-row">
                 <div style={styles.paymentIconBox}>
                   {getMethodIcon(payment.method)}
                 </div>
@@ -188,7 +274,7 @@ export default function Payments() {
                   <h3 style={styles.paymentName}>{payment.client_name}</h3>
                   <p style={styles.paymentNote}>{payment.notes || "No notes"}</p>
                 </div>
-                <div style={styles.paymentRight}>
+                <div style={styles.paymentRight} className="vlt-card-right">
                   <span style={{
                     ...styles.typeBadge,
                     background: `${getTypeColor(payment.type)}15`,
@@ -204,6 +290,27 @@ export default function Payments() {
                     })}
                   </p>
                 </div>
+
+                <div style={styles.rowActions} className="vlt-card-actions">
+                  <button
+                    type="button"
+                    style={styles.iconBtn}
+                    className="vlt-icon-btn"
+                    aria-label={`Edit payment from ${payment.client_name}`}
+                    onClick={() => openEdit(payment)}
+                  >
+                    <Pencil size={14} color="#8a8a8a" />
+                  </button>
+                  <button
+                    type="button"
+                    style={styles.iconBtn}
+                    className="vlt-icon-btn"
+                    aria-label={`Delete payment from ${payment.client_name}`}
+                    onClick={() => handleDelete(payment)}
+                  >
+                    <Trash2 size={14} color="#8b1a1a" />
+                  </button>
+                </div>
               </div>
             ))
           )}
@@ -214,36 +321,38 @@ export default function Payments() {
 }
 
 const styles = {
-  container: { padding: "48px 52px", fontFamily: "'DM Sans', sans-serif", color: "#f5f5f5", minHeight: "100vh", background: "#0a0a0a" },
-  header: { display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "24px" },
-  headerSub: { color: "#6b6b6b", fontSize: "12px", textTransform: "uppercase", letterSpacing: "1px", margin: "0 0 6px 0" },
-  headerTitle: { fontFamily: "'Playfair Display', serif", fontSize: "32px", margin: 0, fontWeight: "600" },
-  newBtn: { display: "flex", alignItems: "center", gap: "8px", padding: "10px 20px", background: "#c9974a", border: "none", borderRadius: "8px", color: "#0a0a0a", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
-  divider: { height: "1px", background: "#1a1a1a", marginBottom: "40px" },
-  summaryGrid: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px", marginBottom: "32px" },
+  container: layout.container,
+  header: layout.header,
+  headerSub: layout.headerSub,
+  headerTitle: layout.headerTitle,
+  newBtn: layout.newBtn,
+  divider: layout.divider,
+  summaryGrid: { display: "grid", gap: "16px", marginBottom: "32px" },
   summaryCard: { background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "20px 24px" },
   summaryIcon: { marginBottom: "12px" },
   summaryLabel: { color: "#6b6b6b", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", margin: "0 0 8px 0" },
   summaryValue: { color: "#f5f5f5", fontSize: "24px", fontWeight: "600", margin: 0, fontFamily: "'Playfair Display', serif" },
   form: { display: "flex", flexDirection: "column", gap: "20px", maxWidth: "700px" },
-  formGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" },
-  field: { display: "flex", flexDirection: "column", gap: "8px" },
-  label: { fontSize: "12px", color: "#555", textTransform: "uppercase", letterSpacing: "0.5px" },
-  inputWrapper: { position: "relative" },
-  inputIcon: { position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" },
-  input: { width: "100%", padding: "12px 16px 12px 40px", background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "8px", color: "#f5f5f5", fontSize: "14px", outline: "none", boxSizing: "border-box", fontFamily: "'DM Sans', sans-serif" },
-  button: { padding: "13px", background: "#c9974a", border: "none", borderRadius: "8px", color: "#0a0a0a", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
-  message: { color: "#c9974a", fontSize: "13px", textAlign: "center", margin: 0 },
+  formGrid: layout.formGrid,
+  field: layout.field,
+  label: layout.label,
+  inputWrapper: layout.inputWrapper,
+  inputIcon: layout.inputIcon,
+  input: { ...layout.input, background: "#0f0f10" },
+  button: layout.button,
+  message: layout.message,
   paymentsList: { display: "flex", flexDirection: "column", gap: "12px" },
-  paymentCard: { display: "flex", alignItems: "center", gap: "20px", background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "20px 24px" },
+  paymentCard: { display: "flex", gap: "20px", background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "20px 24px" },
   paymentIconBox: { width: "44px", height: "44px", borderRadius: "10px", background: "#141416", border: "1px solid #1a1a1a", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
   paymentInfo: { flex: 1 },
   paymentName: { color: "#f5f5f5", fontSize: "16px", margin: "0 0 4px 0", fontWeight: "500" },
   paymentNote: { color: "#6b6b6b", fontSize: "13px", margin: 0 },
-  paymentRight: { textAlign: "right" },
+  paymentRight: {},
   typeBadge: { display: "inline-block", padding: "3px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" },
   paymentAmount: { color: "#f5f5f5", fontSize: "20px", fontWeight: "600", margin: "0 0 2px 0", fontFamily: "'Playfair Display', serif" },
   paymentDate: { color: "#6b6b6b", fontSize: "12px", margin: 0 },
-  emptyState: { background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "60px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "16px" },
-  emptyText: { color: "#5c5c5c", fontSize: "14px", margin: 0 },
+  emptyState: layout.emptyState,
+  emptyText: layout.emptyText,
+  rowActions: layout.rowActions,
+  iconBtn: layout.iconBtn,
 }

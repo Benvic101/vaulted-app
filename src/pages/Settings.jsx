@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { supabase } from "../supabase"
 import { User, Mail, Building, Save } from "lucide-react"
+import * as layout from "../styles/layout"
 
 export default function Settings() {
   const [loading, setLoading] = useState(false)
@@ -70,7 +71,7 @@ useEffect(() => {
   }
 
   return (
-    <div style={styles.container}>
+    <div style={styles.container} className="vlt-page-shell">
       <div style={styles.header}>
         <p style={styles.headerSub}>Manage your studio profile</p>
         <h1 style={styles.headerTitle}>Settings</h1>
@@ -136,19 +137,19 @@ useEffect(() => {
 }
 
 const styles = {
-  container: { padding: "48px 52px", fontFamily: "'DM Sans', sans-serif", color: "#f5f5f5", minHeight: "100vh", background: "#0a0a0a" },
+  container: layout.container,
   header: { marginBottom: "24px" },
-  headerSub: { color: "#6b6b6b", fontSize: "12px", textTransform: "uppercase", letterSpacing: "1px", margin: "0 0 6px 0" },
-  headerTitle: { fontFamily: "'Playfair Display', serif", fontSize: "32px", margin: 0, fontWeight: "600" },
-  divider: { height: "1px", background: "#1a1a1a", marginBottom: "40px" },
+  headerSub: layout.headerSub,
+  headerTitle: layout.headerTitle,
+  divider: layout.divider,
   form: { display: "flex", flexDirection: "column", gap: "24px", maxWidth: "600px" },
   section: { background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "24px", display: "flex", flexDirection: "column", gap: "16px" },
   sectionTitle: { fontFamily: "'Playfair Display', serif", color: "#f5f5f5", fontSize: "16px", margin: 0, fontWeight: "400" },
-  field: { display: "flex", flexDirection: "column", gap: "8px" },
-  label: { fontSize: "12px", color: "#555", textTransform: "uppercase", letterSpacing: "0.5px" },
-  inputWrapper: { position: "relative" },
-  inputIcon: { position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" },
-  input: { width: "100%", padding: "12px 16px 12px 40px", background: "#141416", border: "1px solid #1a1a1a", borderRadius: "8px", color: "#f5f5f5", fontSize: "14px", outline: "none", boxSizing: "border-box", fontFamily: "'DM Sans', sans-serif" },
+  field: layout.field,
+  label: layout.label,
+  inputWrapper: layout.inputWrapper,
+  inputIcon: layout.inputIcon,
+  input: { ...layout.input, background: "#141416" },
   button: { display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", padding: "13px", background: "#c9974a", border: "none", borderRadius: "8px", color: "#0a0a0a", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
-  message: { color: "#c9974a", fontSize: "13px", textAlign: "center", margin: 0 },
+  message: layout.message,
 }

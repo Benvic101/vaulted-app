@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { supabase } from "../supabase"
 import { Upload, Trash2, Image as ImageIcon } from "lucide-react"
+import * as layout from "../styles/layout"
 
 const CATEGORIES = ["All", "Traditional", "Realism", "Blackwork", "Fine Line", "Japanese", "Other"]
 
@@ -106,7 +107,7 @@ export default function Portfolio() {
   const filteredItems = filter === "All" ? items : items.filter((item) => item.category === filter)
 
   return (
-    <div style={styles.container}>
+    <div style={styles.container} className="vlt-page-shell">
       <div style={styles.header}>
         <p style={styles.headerSub}>Showcase your work</p>
         <h1 style={styles.headerTitle}>Portfolio</h1>
@@ -173,7 +174,7 @@ export default function Portfolio() {
                   <p style={styles.cardCategory}>{item.category}</p>
                   {item.caption && <p style={styles.cardCaption}>{item.caption}</p>}
                 </div>
-                <button style={styles.deleteButton} onClick={() => handleDelete(item)}>
+                <button style={styles.deleteButton} className="vlt-icon-btn" onClick={() => handleDelete(item)}>
                   <Trash2 size={14} color="#8b1a1a" />
                 </button>
               </div>
@@ -186,17 +187,17 @@ export default function Portfolio() {
 }
 
 const styles = {
-  container: { padding: "48px 52px", fontFamily: "'DM Sans', sans-serif", color: "#f5f5f5", minHeight: "100vh", background: "#0a0a0a" },
+  container: layout.container,
   header: { marginBottom: "24px" },
-  headerSub: { color: "#6b6b6b", fontSize: "12px", textTransform: "uppercase", letterSpacing: "1px", margin: "0 0 6px 0" },
-  headerTitle: { fontFamily: "'Playfair Display', serif", fontSize: "32px", margin: 0, fontWeight: "600" },
+  headerSub: layout.headerSub,
+  headerTitle: layout.headerTitle,
   divider: { height: "1px", background: "#1a1a1a", marginBottom: "32px" },
   uploadSection: { background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "24px", marginBottom: "32px" },
   sectionTitle: { fontFamily: "'Playfair Display', serif", fontSize: "16px", margin: "0 0 16px 0", fontWeight: "400" },
   uploadRow: { display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" },
   fileInput: { color: "#888", fontSize: "13px" },
-  select: { padding: "10px", background: "#141416", border: "1px solid #1a1a1a", borderRadius: "8px", color: "#f5f5f5", fontSize: "13px", fontFamily: "'DM Sans', sans-serif" },
-  captionInput: { flex: 1, minWidth: "180px", padding: "10px 14px", background: "#141416", border: "1px solid #1a1a1a", borderRadius: "8px", color: "#f5f5f5", fontSize: "13px", outline: "none", fontFamily: "'DM Sans', sans-serif" },
+  select: { padding: "10px", background: "#141416", border: "1px solid #1a1a1a", borderRadius: "8px", color: "#f5f5f5", fontSize: "16px", fontFamily: "'DM Sans', sans-serif" },
+  captionInput: { flex: 1, minWidth: "180px", padding: "10px 14px", background: "#141416", border: "1px solid #1a1a1a", borderRadius: "8px", color: "#f5f5f5", fontSize: "16px", outline: "none", fontFamily: "'DM Sans', sans-serif" },
   button: { display: "flex", alignItems: "center", gap: "6px", padding: "10px 16px", background: "#c9974a", border: "none", borderRadius: "8px", color: "#0a0a0a", fontSize: "13px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
   message: { color: "#c9974a", fontSize: "13px", marginTop: "12px", marginBottom: 0 },
   filterRow: { display: "flex", gap: "8px", marginBottom: "24px", flexWrap: "wrap" },
@@ -208,7 +209,7 @@ const styles = {
   cardFooter: { padding: "14px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" },
   cardCategory: { color: "#c9974a", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", margin: "0 0 4px 0" },
   cardCaption: { color: "#888", fontSize: "13px", margin: 0 },
-  deleteButton: { background: "transparent", border: "none", cursor: "pointer", padding: "4px" },
+  deleteButton: layout.iconBtn,
   empty: { display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", padding: "60px 0", color: "#6b6b6b" },
   emptyText: { fontSize: "14px", margin: 0 },
 }

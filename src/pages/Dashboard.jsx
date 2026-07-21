@@ -9,12 +9,13 @@ import Settings from "./Settings"
 import Portfolio from "./Portfolio"
 import {
   LayoutDashboard, CalendarDays, Users, FileText,
-  Image, CreditCard, SettingsIcon, LogOut, TrendingUp
+  Image, CreditCard, SettingsIcon, LogOut, TrendingUp, Menu, X
 } from "lucide-react"
 
 export default function Dashboard() {
   const [user, setUser] = useState(null)
   const [activePage, setActivePage] = useState("dashboard")
+  const [drawerOpen, setDrawerOpen] = useState(false)
   const [statsLoading, setStatsLoading] = useState(true)
   const [stats, setStats] = useState({
     totalClients: 0,
@@ -100,11 +101,43 @@ export default function Dashboard() {
     { label: "Payments", icon: <CreditCard size={24} />, color: "#2d6a4f", page: "payments" },
   ]
 
-  return (
-    <div style={styles.container}>
+  const closeDrawer = () => setDrawerOpen(false)
 
-      {/* Sidebar */}
-      <div style={styles.sidebar}>
+  return (
+    <div style={styles.container} className="vlt-full-height">
+
+      {/* Mobile top bar — hidden above the mobile breakpoint via CSS */}
+      <div style={styles.mobileTopbar} className="vlt-mobile-topbar">
+        <button
+          type="button"
+          style={styles.hamburgerBtn}
+          aria-label={drawerOpen ? "Close navigation menu" : "Open navigation menu"}
+          aria-expanded={drawerOpen}
+          aria-controls="vlt-sidebar-nav"
+          onClick={() => setDrawerOpen((open) => !open)}
+        >
+          {drawerOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
+        <img
+          src={logo}
+          alt="Vaulted"
+          style={{ width: "26px", height: "26px", objectFit: "cover", borderRadius: "50%", border: "1px solid #1e1e1e" }}
+        />
+        <h2 style={styles.mobileTopbarTitle}>Vaulted</h2>
+      </div>
+
+      {/* Scrim — only rendered visually on mobile while the drawer is open */}
+      <div
+        className={`vlt-drawer-overlay${drawerOpen ? " vlt-drawer-overlay-visible" : ""}`}
+        onClick={closeDrawer}
+      />
+
+      {/* Sidebar — permanent on desktop, icon rail on tablet, off-canvas drawer on mobile */}
+      <div
+        id="vlt-sidebar-nav"
+        style={styles.sidebar}
+        className={`vlt-sidebar${drawerOpen ? " vlt-sidebar-open" : ""}`}
+      >
         <div style={styles.sidebarBrand}>
           <img
   src={logo}
@@ -124,34 +157,46 @@ export default function Dashboard() {
           {navItems.map((item) => {
             const isActive = activePage === item.label.toLowerCase()
             return (
-              <div
+              <button
                 key={item.label}
+                type="button"
+                aria-current={isActive ? "page" : undefined}
                 style={{
                   ...styles.navItem,
                   background: isActive ? "rgba(201,151,74,0.1)" : "transparent",
                   borderLeft: isActive ? "2px solid #c9974a" : "2px solid transparent",
                   color: isActive ? "#c9974a" : "#555",
                 }}
-                onClick={() => setActivePage(item.label.toLowerCase())}
+                onClick={() => {
+                  setActivePage(item.label.toLowerCase())
+                  closeDrawer()
+                }}
               >
                 {item.icon}
-                <span style={styles.navLabel}>{item.label}</span>
-              </div>
+                <span style={styles.navLabel} className="vlt-sidebar-label">{item.label}</span>
+              </button>
             )
           })}
         </nav>
 
-        <div
+        <button
+          type="button"
           style={styles.logoutBtn}
           onClick={() => supabase.auth.signOut()}
         >
           <LogOut size={16} />
-          <span>Logout</span>
-        </div>
+          <span className="vlt-sidebar-label">Logout</span>
+        </button>
       </div>
 
       {/* Main */}
-      <div style={styles.main}>
+      <div style={styles.main} className="vlt-main">
+        {/* Mobile-only spacer pushes content below the fixed top bar without
+            touching main's own padding property (avoids any inline/class
+            override collision on the same property). Lives inside main,
+            stacked in normal block flow above the page content — main
+            itself has no flex-direction, so this sits above, not beside. */}
+        <div className="vlt-mobile-topbar-spacer" />
         {activePage === "bookings" && <Bookings />}
         {activePage === "clients" && <Clients />}
         {activePage === "consent forms" && <ConsentForms />}
@@ -162,7 +207,7 @@ export default function Dashboard() {
         {activePage === "dashboard" && (
           <>
             {/* Header */}
-            <div style={styles.header}>
+            <div style={styles.header} className="vlt-dashboard-header">
               <div>
                 <p style={styles.headerGreeting}>Good day,</p>
                 <h1 style={styles.headerTitle}>{user?.email?.split("@")[0]}</h1>
@@ -178,41 +223,49 @@ export default function Dashboard() {
             {/* Divider */}
             <div style={styles.divider} />
 
-            {/* Stat Cards */}
-            <div style={styles.statsGrid}>
-              {statCards.map((stat) => (
-                <div key={stat.label} style={styles.statCard}>
-                  <div style={{ ...styles.statIconBox, color: stat.color }}>
-                    {stat.icon}
-                  </div>
-                  <div style={styles.statValue}>
-                    {statsLoading ? <span style={styles.statValueSkeleton}>—</span> : stat.value}
-                  </div>
-                  <div style={styles.statLabel}>{stat.label}</div>
+            {/* Reorderable content: on mobile, Today's Appointments moves to
+                the top (see .vlt-order-* in index.css); desktop/tablet keep
+                the original KPIs -> Quick Actions -> Appointments order. */}
+            <div className="vlt-dashboard-content">
+              <div className="vlt-order-stats">
+                <div style={styles.statsGrid} className="vlt-kpi-grid">
+                  {statCards.map((stat) => (
+                    <div key={stat.label} style={styles.statCard}>
+                      <div style={{ ...styles.statIconBox, color: stat.color }}>
+                        {stat.icon}
+                      </div>
+                      <div style={styles.statValue}>
+                        {statsLoading ? <span style={styles.statValueSkeleton}>—</span> : stat.value}
+                      </div>
+                      <div style={styles.statLabel}>{stat.label}</div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
 
-            {/* Quick Actions */}
-            <h2 style={styles.sectionTitle}>Quick Actions</h2>
-            <div style={styles.actionsGrid}>
-              {quickActions.map((action) => (
-                <div
-                  key={action.label}
-                  style={{ ...styles.actionCard, borderTop: `3px solid ${action.color}` }}
-                  onClick={() => setActivePage(action.page)}
-                >
-                  <div style={{ color: action.color, marginBottom: "12px" }}>
-                    {action.icon}
-                  </div>
-                  <div style={styles.actionLabel}>{action.label}</div>
+              <div className="vlt-order-actions">
+                <h2 style={styles.sectionTitle}>Quick Actions</h2>
+                <div style={styles.actionsGrid} className="vlt-action-grid">
+                  {quickActions.map((action) => (
+                    <div
+                      key={action.label}
+                      style={{ ...styles.actionCard, borderTop: `3px solid ${action.color}` }}
+                      onClick={() => setActivePage(action.page)}
+                    >
+                      <div style={{ color: action.color, marginBottom: "12px" }}>
+                        {action.icon}
+                      </div>
+                      <div style={styles.actionLabel}>{action.label}</div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
 
-            {/* Today's Appointments */}
-            <h2 style={styles.sectionTitle}>Today's Appointments</h2>
-            <TodayAppointments artistId={user?.id} />
+              <div className="vlt-order-appointments" style={{ marginBottom: "48px" }}>
+                <h2 style={styles.sectionTitle}>Today's Appointments</h2>
+                <TodayAppointments artistId={user?.id} />
+              </div>
+            </div>
           </>
         )}
       </div>
@@ -276,19 +329,43 @@ function TodayAppointments({ artistId }) {
 const styles = {
   container: {
     display: "flex",
-    minHeight: "100vh",
     background: "#0a0a0a",
     fontFamily: "'DM Sans', sans-serif",
   },
   sidebar: {
-    width: "240px",
     background: "#0f0f10",
     borderRight: "1px solid #1a1a1a",
     display: "flex",
     flexDirection: "column",
     padding: "32px 0",
     position: "fixed",
-    height: "100vh",
+    top: 0,
+    left: 0,
+    zIndex: 40,
+  },
+  mobileTopbar: {
+    background: "#0f0f10",
+    borderBottom: "1px solid #1a1a1a",
+    gap: "12px",
+    padding: "0 16px",
+  },
+  mobileTopbarTitle: {
+    fontFamily: "'Playfair Display', serif",
+    color: "#f5f5f5",
+    fontSize: "16px",
+    margin: 0,
+    letterSpacing: "1px",
+  },
+  hamburgerBtn: {
+    background: "transparent",
+    border: "none",
+    color: "#f5f5f5",
+    padding: "10px",
+    margin: "0 -6px 0 -10px",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
   },
   sidebarBrand: {
     display: "flex",
@@ -324,6 +401,10 @@ const styles = {
     cursor: "pointer",
     transition: "all 0.2s",
     fontSize: "14px",
+    border: "none",
+    width: "100%",
+    textAlign: "left",
+    fontFamily: "'DM Sans', sans-serif",
   },
   navLabel: { fontSize: "14px" },
   logoutBtn: {
@@ -335,11 +416,23 @@ const styles = {
     cursor: "pointer",
     fontSize: "14px",
     borderTop: "1px solid #1a1a1a",
+    borderLeft: "none",
+    borderRight: "none",
+    borderBottom: "none",
     marginTop: "auto",
+    background: "transparent",
+    width: "100%",
+    textAlign: "left",
+    fontFamily: "'DM Sans', sans-serif",
   },
   main: {
-    marginLeft: "240px",
     flex: 1,
+    // min-width: 0 overrides the flex-item default of `auto`, which would
+    // otherwise let any long unbreakable content (e.g. a signing URL on the
+    // Consent Forms page) dictate main's minimum width and force page-level
+    // horizontal overflow on phones. With 0, main always caps at the
+    // viewport and inner truncation (ellipsis) can actually engage.
+    minWidth: 0,
     padding: "48px 52px",
   },
   header: {
@@ -374,7 +467,6 @@ const styles = {
   },
   statsGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(4, 1fr)",
     gap: "16px",
     marginBottom: "48px",
   },
@@ -409,7 +501,6 @@ const styles = {
   },
   actionsGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(4, 1fr)",
     gap: "16px",
     marginBottom: "48px",
   },
