@@ -98,7 +98,8 @@ export default function Portfolio() {
       await supabase.storage.from("portfolio").remove([storagePath])
     }
 
-    const { error } = await supabase.from("portfolio_items").delete().eq("id", item.id)
+    const { data: { user } } = await supabase.auth.getUser()
+    const { error } = await supabase.from("portfolio_items").delete().eq("id", item.id).eq("artist_id", user.id)
     if (!error) {
       setItems(items.filter((i) => i.id !== item.id))
     }
