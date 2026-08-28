@@ -451,6 +451,25 @@ a:focus-visible,
   }
 }
 
+/* .vlt-confirm-card / .vlt-confirm-actions: the typed-confirmation delete
+   dialog (Mission 9). Same padding scale as .vlt-sign-card. The two action
+   buttons sit side by side normally, but on a narrow phone a 50/50 split
+   squeezes "Delete permanently" onto three lines, so they stack — with the
+   destructive button last, matching its position in the horizontal layout. */
+.vlt-confirm-card {
+  padding: 28px;
+}
+
+@media (max-width: 480px) {
+  .vlt-confirm-card {
+    padding: 22px;
+  }
+
+  .vlt-confirm-actions {
+    flex-direction: column-reverse;
+  }
+}
+
 /* ---- Standalone pages (Mission 7, Stage 4) ----
    Applies to App.jsx's auth screen and SignConsentForm.jsx — neither
    lives inside the dashboard shell, so neither uses .vlt-page-shell.

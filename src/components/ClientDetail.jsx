@@ -273,6 +273,11 @@ export default function ClientDetail({ client, onBack, onEdit, onDeleted }) {
                     ) : (
                       <span style={styles.signedBadge}><CheckSquare size={11} /> Signed</span>
                     )}
+                    {f.edited_at && (
+                      <span style={styles.editedBadge}>
+                        Edited {new Date(f.edited_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                      </span>
+                    )}
                     {f.signed_at && (
                       <p style={styles.rowSub}>
                         {new Date(f.signed_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
@@ -335,6 +340,7 @@ const styles = {
   statusBadge: { display: "inline-block", padding: "3px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" },
   signedBadge: { display: "inline-flex", alignItems: "center", gap: "6px", padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", background: "rgba(45,106,79,0.15)", color: "#2d6a4f", border: "1px solid rgba(45,106,79,0.2)", marginBottom: "8px" },
   sentBadge: { display: "inline-flex", alignItems: "center", gap: "6px", padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", background: "rgba(201,151,74,0.12)", color: "#c9974a", border: "1px solid rgba(201,151,74,0.25)", marginBottom: "8px" },
+  editedBadge: { display: "inline-flex", alignItems: "center", padding: "3px 10px", borderRadius: "20px", fontSize: "10px", fontWeight: "600", background: "#141416", color: "#7a7a7a", border: "1px solid #1e1e1e", marginBottom: "8px" },
   totalsRow: { display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" },
   totalsText: { color: "#888", fontSize: "13px" },
   emptyState: { background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "40px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", marginBottom: "48px" },

@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react"
 import { supabase } from "../supabase"
-import { FileText, Mail, CalendarDays, Plus, ArrowLeft, CheckSquare, Send, Link2, Copy, Check, Clock } from "lucide-react"
+import { FileText, Mail, CalendarDays, Plus, ArrowLeft, CheckSquare, Send, Link2, Copy, Check, Clock, Pencil, Trash2, User } from "lucide-react"
 import ClientPicker from "../components/ClientPicker"
+import ConfirmDeleteDialog from "../components/ConfirmDeleteDialog"
 import * as layout from "../styles/layout"
 
 const emptyForm = {
@@ -15,6 +16,22 @@ const emptyForm = {
 
 const emptySendForm = { client_id: null, client_name: "", client_email: "", date: "" }
 
+// Fields the artist may change on an unsigned form. The client identity
+// (client_id / client_name) is deliberately absent — re-targeting an already-
+// sent signing link to a different client is not allowed, so that edit path
+// does not exist in the UI and a DB trigger rejects it if attempted anyway.
+// The four consent/signature booleans are absent for the same reason they're
+// hardcoded false in handleSendPrefilled: only the client may check those.
+const EDITABLE_FIELDS = [
+  "client_email", "date",
+  "blood_thinner", "skin_condition",
+  "allergies", "allergies_detail",
+  "pregnant", "diabetes", "heart_condition",
+]
+
+const formatShortDate = (value) =>
+  new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+
 export default function ConsentForms() {
   const [view, setView] = useState("list")
   const [forms, setForms] = useState([])
@@ -22,6 +39,10 @@ export default function ConsentForms() {
   const [listLoading, setListLoading] = useState(true)
   const [message, setMessage] = useState("")
   const [form, setForm] = useState(emptyForm)
+  const [editingId, setEditingId] = useState(null)
+  const [listMessage, setListMessage] = useState("")
+  const [confirmTarget, setConfirmTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
   const [sendForm, setSendForm] = useState(emptySendForm)
   const [sendLoading, setSendLoading] = useState(false)
   const [sendMessage, setSendMessage] = useState("")
@@ -49,6 +70,134 @@ export default function ConsentForms() {
   const handleChange = (e) => {
     const value = e.target.type === "checkbox" ? e.target.checked : e.target.value
     setForm({ ...form, [e.target.name]: value })
+  }
+
+  const openNew = () => {
+    setEditingId(null)
+    setForm(emptyForm)
+    setMessage("")
+    setView("form")
+  }
+
+  // Only reachable for unsigned forms — signed forms expose no edit control.
+  const openEdit = (f) => {
+    setEditingId(f.id)
+    setForm({
+      client_id: f.client_id ?? null,
+      client_name: f.client_name ?? "",
+      client_email: f.client_email ?? "",
+      date: f.date ?? "",
+      blood_thinner: f.blood_thinner ?? false,
+      skin_condition: f.skin_condition ?? false,
+      allergies: f.allergies ?? false,
+      allergies_detail: f.allergies_detail ?? "",
+      pregnant: f.pregnant ?? false,
+      diabetes: f.diabetes ?? false,
+      heart_condition: f.heart_condition ?? false,
+      age_verified: false,
+      design_approved: false,
+      aftercare_acknowledged: false,
+      photo_consent: false,
+    })
+    setMessage("")
+    setView("form")
+  }
+
+  const backToList = () => {
+    setEditingId(null)
+    setForm(emptyForm)
+    setMessage("")
+    setView("list")
+  }
+
+  // Edits only ever apply to an unsigned ('sent') form. edited_at is stamped
+  // so the artist can see the content changed after the link went out — the
+  // client may already have that link open on stale content.
+  const handleUpdate = async () => {
+    if (!form.client_email || !form.date) {
+      setMessage("Please fill in client email and date.")
+      return
+    }
+    setLoading(true)
+    setMessage("")
+    const { data: { user } } = await supabase.auth.getUser()
+    const patch = { edited_at: new Date().toISOString() }
+    for (const key of EDITABLE_FIELDS) patch[key] = form[key]
+    const { data, error } = await supabase
+      .from("consent_forms")
+      .update(patch)
+      .eq("id", editingId)
+      .eq("artist_id", user.id)
+      .select()
+    setLoading(false)
+    if (error) {
+      console.error("Consent form update error:", error)
+      // The guard trigger and the restrictive UPDATE policy both reject edits
+      // to a signed form. This is how the "client signed while the artist had
+      // the form open for editing" race surfaces.
+      setMessage(
+        /immutable/i.test(error.message)
+          ? "This form has just been signed by the client and can no longer be edited."
+          : "Error: " + error.message
+      )
+      fetchForms()
+      return
+    }
+    if (!data || data.length === 0) {
+      console.error("Consent form update affected 0 rows", { id: editingId, artist_id: user.id })
+      // Zero rows rather than an error means the restrictive policy filtered
+      // the row out (it is now signed) or the form was deleted elsewhere.
+      setMessage("Update failed — this form is no longer an editable unsigned form. Refreshing.")
+      fetchForms()
+      return
+    }
+    setMessage("Changes saved!")
+    fetchForms()
+    setTimeout(() => backToList(), 1200)
+  }
+
+  const deleteForm = async (f) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data, error } = await supabase
+      .from("consent_forms")
+      .delete()
+      .eq("id", f.id)
+      .eq("artist_id", user.id)
+      .select()
+    if (error) {
+      console.error("Consent form delete error:", error)
+      setListMessage("Delete error: " + error.message)
+      return false
+    }
+    if (!data || data.length === 0) {
+      console.error("Consent form delete affected 0 rows", { id: f.id, artist_id: user.id })
+      setListMessage("Delete failed — no matching row (check DELETE RLS policy).")
+      return false
+    }
+    setForms((prev) => prev.filter((x) => x.id !== f.id))
+    return true
+  }
+
+  // Two tiers of confirmation by status. Unsigned forms use the same
+  // window.confirm as every other page — nothing legally meaningful is lost.
+  // Signed forms destroy a signature and health declaration, so they get the
+  // typed-name dialog instead.
+  const handleDelete = async (f) => {
+    setListMessage("")
+    if (f.status === "signed") {
+      setConfirmTarget(f)
+      return
+    }
+    if (!window.confirm(`Delete the unsigned consent form for ${f.client_name}? This cannot be undone.`)) return
+    await deleteForm(f)
+  }
+
+  const confirmSignedDelete = async () => {
+    setDeleting(true)
+    const ok = await deleteForm(confirmTarget)
+    setDeleting(false)
+    setConfirmTarget(null)
+    if (ok) setListMessage("Signed consent form deleted. The action has been recorded in your audit log.")
   }
 
   const handleSubmit = async () => {
@@ -246,14 +395,14 @@ export default function ConsentForms() {
             <button style={styles.newBtnOutline} onClick={openSend}>
               <Send size={16} /> Send for Signature
             </button>
-            <button style={styles.newBtn} onClick={() => setView("form")}>
+            <button style={styles.newBtn} onClick={openNew}>
               <Plus size={16} /> New Form
             </button>
           </div>
         ) : (
           <button
             style={styles.newBtn}
-            onClick={() => (view === "form" ? setView("list") : backToListFromSend())}
+            onClick={() => (view === "form" ? backToList() : backToListFromSend())}
           >
             <ArrowLeft size={16} /> Back to List
           </button>
@@ -349,7 +498,15 @@ export default function ConsentForms() {
       )}
 
       {view === "form" && (
-        <form style={styles.form} onSubmit={(e) => { e.preventDefault(); handleSubmit() }}>
+        <form style={styles.form} onSubmit={(e) => { e.preventDefault(); if (editingId) { handleUpdate() } else { handleSubmit() } }}>
+
+          {editingId && (
+            <div style={styles.editNotice}>
+              You're editing a form that has already been sent to {form.client_name}. They may
+              have the signing link open — saving will mark the form as edited so you can tell
+              the content changed after it was sent.
+            </div>
+          )}
 
           {/* Client Details */}
           <div style={styles.section}>
@@ -357,15 +514,25 @@ export default function ConsentForms() {
             <div style={styles.formGrid} className="vlt-form-grid">
               <div style={styles.field}>
                 <label style={styles.label}>Client *</label>
-                <ClientPicker
-                  value={form.client_id ? { id: form.client_id, name: form.client_name } : null}
-                  onChange={(c) => setForm((f) => ({
-                    ...f,
-                    client_id: c?.id ?? null,
-                    client_name: c?.name ?? "",
-                    client_email: c?.email && !f.client_email ? c.email : f.client_email,
-                  }))}
-                />
+                {editingId ? (
+                  // Locked on purpose: an already-sent signing link cannot be
+                  // re-pointed at a different client. Send that client a new form.
+                  <div style={styles.lockedField}>
+                    <User size={15} color="#6b6b6b" />
+                    <span style={styles.lockedValue}>{form.client_name}</span>
+                    <span style={styles.lockedHint}>can't be changed</span>
+                  </div>
+                ) : (
+                  <ClientPicker
+                    value={form.client_id ? { id: form.client_id, name: form.client_name } : null}
+                    onChange={(c) => setForm((f) => ({
+                      ...f,
+                      client_id: c?.id ?? null,
+                      client_name: c?.name ?? "",
+                      client_email: c?.email && !f.client_email ? c.email : f.client_email,
+                    }))}
+                  />
+                )}
               </div>
               <div style={styles.field}>
                 <label style={styles.label}>Email *</label>
@@ -404,34 +571,54 @@ export default function ConsentForms() {
             )}
           </div>
 
-          {/* Consent */}
-          <div style={styles.section}>
-            <h3 style={styles.sectionTitle}>Client Consent</h3>
-            <p style={styles.sectionSub}>
-              Required fields must be checked to proceed. If sent for final approval instead,
-              the client will re-confirm these themselves — checking them here has no effect on that path.
-            </p>
-            <div style={styles.consentList}>
-              <CheckBox name="age_verified" label="I confirm I am 18 years or older" required />
-              <CheckBox name="design_approved" label="I have reviewed and approved the design" required />
-              <CheckBox name="aftercare_acknowledged" label="I have read and understood aftercare instructions" required />
-              <CheckBox name="photo_consent" label="I consent to photos being used for portfolio purposes" />
+          {/* Consent — hidden while editing a sent form: those four fields must
+              stay unchecked until the client checks them on the signing page,
+              and the DB CHECK constraint enforces that independently. */}
+          {!editingId && (
+            <div style={styles.section}>
+              <h3 style={styles.sectionTitle}>Client Consent</h3>
+              <p style={styles.sectionSub}>
+                Required fields must be checked to proceed. If sent for final approval instead,
+                the client will re-confirm these themselves — checking them here has no effect on that path.
+              </p>
+              <div style={styles.consentList}>
+                <CheckBox name="age_verified" label="I confirm I am 18 years or older" required />
+                <CheckBox name="design_approved" label="I have reviewed and approved the design" required />
+                <CheckBox name="aftercare_acknowledged" label="I have read and understood aftercare instructions" required />
+                <CheckBox name="photo_consent" label="I consent to photos being used for portfolio purposes" />
+              </div>
             </div>
-          </div>
+          )}
 
-          <div style={{ display: "flex", gap: "10px" }}>
-            <button type="submit" style={{ ...styles.button, flex: 1 }} disabled={loading}>
-              {loading ? "Saving..." : "Save Consent Form"}
-            </button>
-            <button
-              type="button"
-              style={{ ...styles.buttonOutline, flex: 1 }}
-              disabled={loading}
-              onClick={handleSendPrefilled}
-            >
-              {loading ? "Sending..." : "Send to Client for Final Approval"}
-            </button>
-          </div>
+          {editingId ? (
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button type="submit" style={{ ...styles.button, flex: 1 }} disabled={loading}>
+                {loading ? "Saving..." : "Save Changes"}
+              </button>
+              <button
+                type="button"
+                style={{ ...styles.buttonOutline, flex: 1 }}
+                disabled={loading}
+                onClick={backToList}
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button type="submit" style={{ ...styles.button, flex: 1 }} disabled={loading}>
+                {loading ? "Saving..." : "Save Consent Form"}
+              </button>
+              <button
+                type="button"
+                style={{ ...styles.buttonOutline, flex: 1 }}
+                disabled={loading}
+                onClick={handleSendPrefilled}
+              >
+                {loading ? "Sending..." : "Send to Client for Final Approval"}
+              </button>
+            </div>
+          )}
           {message && <p style={styles.message}>{message}</p>}
         </form>
       )}
@@ -463,28 +650,70 @@ export default function ConsentForms() {
                     </div>
                   </div>
                   <div style={styles.formRight} className="vlt-card-right">
-                    {f.status === "sent" ? (
+                    {f.status === "signed" ? (
+                      <span style={styles.signedBadge}>
+                        <CheckSquare size={12} /> Signed
+                      </span>
+                    ) : f.status === "draft" ? (
+                      <span style={styles.draftBadge}>
+                        <FileText size={12} /> Draft
+                      </span>
+                    ) : (
                       <span style={styles.sentBadge}>
                         <Clock size={12} /> Awaiting Signature
                       </span>
-                    ) : (
-                      <span style={styles.signedBadge}>
-                        <CheckSquare size={12} /> Signed
+                    )}
+                    {f.edited_at && (
+                      <span style={styles.editedBadge}>
+                        <Pencil size={10} /> Edited {formatShortDate(f.edited_at)}
                       </span>
                     )}
                     {f.signed_at && (
                       <p style={styles.formDate}>
-                        {new Date(f.signed_at).toLocaleDateString("en-US", {
-                          month: "short", day: "numeric", year: "numeric"
-                        })}
+                        {formatShortDate(f.signed_at)}
                       </p>
                     )}
+                  </div>
+
+                  <div style={styles.rowActions} className="vlt-card-actions">
+                    {/* No edit control for signed forms — content, answers and
+                        signature are immutable once signed. */}
+                    {f.status !== "signed" && (
+                      <button
+                        type="button"
+                        style={styles.iconBtn}
+                        className="vlt-icon-btn"
+                        aria-label={`Edit consent form for ${f.client_name}`}
+                        onClick={() => openEdit(f)}
+                      >
+                        <Pencil size={14} color="#8a8a8a" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      style={styles.iconBtn}
+                      className="vlt-icon-btn"
+                      aria-label={`Delete consent form for ${f.client_name}`}
+                      onClick={() => handleDelete(f)}
+                    >
+                      <Trash2 size={14} color="#8b1a1a" />
+                    </button>
                   </div>
                 </div>
               ))}
             </div>
           )}
+          {listMessage && <p style={styles.message}>{listMessage}</p>}
         </div>
+      )}
+
+      {confirmTarget && (
+        <ConfirmDeleteDialog
+          clientName={confirmTarget.client_name}
+          busy={deleting}
+          onCancel={() => setConfirmTarget(null)}
+          onConfirm={confirmSignedDelete}
+        />
       )}
     </div>
   )
@@ -529,6 +758,17 @@ const styles = {
   formMeta: { display: "flex", gap: "16px" },
   formMetaItem: { display: "flex", alignItems: "center", gap: "6px", color: "#6b6b6b", fontSize: "13px" },
   formRight: {},
+  rowActions: layout.rowActions,
+  iconBtn: layout.iconBtn,
+  editNotice: { background: "rgba(201,151,74,0.05)", border: "1px solid rgba(201,151,74,0.15)", borderRadius: "8px", padding: "14px 18px", color: "#a8894f", fontSize: "13px", lineHeight: "1.6" },
+  lockedField: { display: "flex", alignItems: "center", gap: "8px", padding: "12px 16px", background: "#141416", border: "1px solid #1a1a1a", borderRadius: "8px", boxSizing: "border-box" },
+  lockedValue: { flex: 1, minWidth: 0, color: "#f5f5f5", fontSize: "16px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  lockedHint: { color: "#555", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0 },
+  editedBadge: { display: "inline-flex", alignItems: "center", gap: "5px", padding: "3px 10px", borderRadius: "20px", fontSize: "10px", fontWeight: "600", background: "#141416", color: "#7a7a7a", border: "1px solid #1e1e1e", marginBottom: "8px" },
+  // 'draft' is permitted by the status CHECK constraint but nothing in the app
+  // creates one today. Rendered distinctly rather than silently falling into
+  // the "Awaiting Signature" branch, which would misreport an unsent form.
+  draftBadge: { display: "inline-flex", alignItems: "center", gap: "6px", padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", background: "#141416", color: "#8a8a8a", border: "1px solid #232323", marginBottom: "8px" },
   signedBadge: { display: "inline-flex", alignItems: "center", gap: "6px", padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", background: "rgba(45,106,79,0.15)", color: "#2d6a4f", border: "1px solid rgba(45,106,79,0.2)", marginBottom: "8px" },
   sentBadge: { display: "inline-flex", alignItems: "center", gap: "6px", padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", background: "rgba(201,151,74,0.12)", color: "#c9974a", border: "1px solid rgba(201,151,74,0.25)", marginBottom: "8px" },
   formDate: { color: "#6b6b6b", fontSize: "12px", margin: 0 },
