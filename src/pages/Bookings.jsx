@@ -3,7 +3,7 @@ import { supabase } from "../supabase"
 import { CalendarDays, Clock, Mail, FileText, Plus, ArrowLeft, DollarSign, Pencil, Trash2, CheckSquare, XCircle, ChevronDown } from "lucide-react"
 import ClientPicker from "../components/ClientPicker"
 import * as layout from "../styles/layout"
-
+import { parseLocalDate } from '../utils/dateHelpers';
 const STATUS_OPTIONS = ["upcoming", "completed", "cancelled"]
 
 const emptyForm = {
@@ -352,12 +352,14 @@ export default function Bookings() {
                   className="vlt-card-row"
                 >
                   <div style={styles.bookingDateBox}>
+                  <div style={styles.bookingDateBox}>
                     <span style={styles.bookingDay}>
-                      {new Date(booking.date).toLocaleDateString("en-US", { day: "numeric" })}
+                      {parseLocalDate(booking.date).toLocaleDateString("en-US", { day: "numeric" })}
                     </span>
                     <span style={styles.bookingMonth}>
-                      {new Date(booking.date).toLocaleDateString("en-US", { month: "short" })}
+                      {parseLocalDate(booking.date).toLocaleDateString("en-US", { month: "short" })}
                     </span>
+                  </div>
                   </div>
 
                   <div style={styles.bookingInfo}>

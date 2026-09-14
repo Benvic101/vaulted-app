@@ -7,6 +7,7 @@ import ConsentForms from "./ConsentForms"
 import Payments from "./Payments"
 import Settings from "./Settings"
 import Portfolio from "./Portfolio"
+
 import {
   LayoutDashboard, CalendarDays, Users, FileText,
   Image, CreditCard, SettingsIcon, LogOut, TrendingUp, Menu, X

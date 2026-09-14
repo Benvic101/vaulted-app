@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react"
 import { supabase } from "../supabase"
+import { parseLocalDate } from '../utils/dateHelpers';
+
 import {
   User, Mail, Phone, FileText, ArrowLeft, Pencil, Trash2,
   CalendarDays, Clock, CreditCard, CheckSquare,
@@ -96,7 +98,7 @@ export default function ClientDetail({ client, onBack, onEdit, onDeleted }) {
     {
       label: "Upcoming Booking",
       value: upcomingBooking
-        ? new Date(upcomingBooking.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+        ? parseLocalDate(upcomingBooking.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
         : "None scheduled",
       icon: <ClockIcon size={18} />,
     },
@@ -111,7 +113,7 @@ export default function ClientDetail({ client, onBack, onEdit, onDeleted }) {
     {
       label: "Last Visit",
       value: lastVisit
-        ? new Date(lastVisit.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+        ? parseLocalDate(lastVisit.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
         : "No visits yet",
       icon: <CheckSquare size={18} />,
     },
@@ -186,8 +188,8 @@ export default function ClientDetail({ client, onBack, onEdit, onDeleted }) {
               {bookings.map((b) => (
                 <div key={b.id} style={styles.row} className="vlt-card-row">
                   <div style={styles.rowDateBox}>
-                    <span style={styles.rowDay}>{new Date(b.date).toLocaleDateString("en-US", { day: "numeric" })}</span>
-                    <span style={styles.rowMonth}>{new Date(b.date).toLocaleDateString("en-US", { month: "short" })}</span>
+                    <span style={styles.rowDay}>{parseLocalDate(b.date)(b.date).toLocaleDateString("en-US", { day: "numeric" })}</span>
+                    <span style={styles.rowMonth}>{parseLocalDate(b.date)(b.date).toLocaleDateString("en-US", { month: "short" })}</span>
                   </div>
                   <div style={styles.rowInfo}>
                     <h3 style={styles.rowTitle}>{b.session_type}</h3>
@@ -264,7 +266,7 @@ export default function ClientDetail({ client, onBack, onEdit, onDeleted }) {
               {forms.map((f) => (
                 <div key={f.id} style={styles.row} className="vlt-card-row">
                   <div style={styles.rowInfo}>
-                    <h3 style={styles.rowTitle}>{new Date(f.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</h3>
+                    <h3 style={styles.rowTitle}>{parseLocalDate(f.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</h3>
                     <p style={styles.rowMeta}>{f.client_email}</p>
                   </div>
                   <div style={styles.rowRight} className="vlt-card-right">
