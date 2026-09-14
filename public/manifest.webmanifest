@@ -1,0 +1,17 @@
+{
+  "name": "Vaulted",
+  "short_name": "Vaulted",
+  "description": "Vaulted client and booking management.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#16110f",
+  "theme_color": "#16110f",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "1024x1024",
+      "purpose": "any maskable"
+    }
+  ]
+}
