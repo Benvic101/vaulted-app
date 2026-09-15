@@ -4,6 +4,7 @@ import { FileText, Mail, CalendarDays, Plus, ArrowLeft, CheckSquare, Send, Link2
 import ClientPicker from "../components/ClientPicker"
 import ConfirmDeleteDialog from "../components/ConfirmDeleteDialog"
 import * as layout from "../styles/layout"
+import { parseLocalDate } from "../utils/dateHelpers"
 
 const emptyForm = {
   client_id: null, client_name: "", client_email: "", date: "",
@@ -646,7 +647,7 @@ export default function ConsentForms({ startInForm }) {
                     <h3 style={styles.formName}>{f.client_name}</h3>
                     <div style={styles.formMeta}>
                       <span style={styles.formMetaItem}><Mail size={12} color="#6b6b6b" /> {f.client_email}</span>
-                      <span style={styles.formMetaItem}><CalendarDays size={12} color="#6b6b6b" /> {f.date}</span>
+                      <span style={styles.formMetaItem}><CalendarDays size={12} color="#6b6b6b" /> {parseLocalDate(f.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
                     </div>
                   </div>
                   <div style={styles.formRight} className="vlt-card-right">

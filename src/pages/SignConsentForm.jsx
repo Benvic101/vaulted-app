@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom"
 import { supabase } from "../supabase"
 import { CalendarDays, Mail, User, CheckCircle, Eraser } from "lucide-react"
 import logo from "../assets/logo.png"
+import { parseLocalDate } from "../utils/dateHelpers"
 
 const emptyAnswers = {
   blood_thinner: false, skin_condition: false,
@@ -209,7 +210,7 @@ export default function SignConsentForm() {
             <h3 style={styles.sectionTitle}>Client Details</h3>
             <div style={styles.readRow}><User size={14} color="#6b6b6b" /> {formData.client_name}</div>
             <div style={styles.readRow}><Mail size={14} color="#6b6b6b" /> {formData.client_email}</div>
-            <div style={styles.readRow}><CalendarDays size={14} color="#6b6b6b" /> {formData.date}</div>
+            <div style={styles.readRow}><CalendarDays size={14} color="#6b6b6b" /> {parseLocalDate(formData.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
           </div>
 
           <div style={styles.section}>
