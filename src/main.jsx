@@ -5,6 +5,9 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import './index.css'
 import App from './App.jsx'
 import SignConsentForm from './pages/SignConsentForm.jsx'
+import { getTheme, setTheme } from './utils/themeHelpers';
+
+setTheme(getTheme()); // applies saved theme on load
 
 // The worker takes control immediately when a new production build is found.
 // Reloading only after the controller changes prevents serving a new HTML file

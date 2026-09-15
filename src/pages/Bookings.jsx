@@ -17,8 +17,8 @@ const emptyForm = {
   notes: "",
 }
 
-export default function Bookings() {
-  const [view, setView] = useState("list")
+export default function Bookings({ startInForm }) {
+  const [view, setView] = useState(startInForm ? "form" : "list")
   const [bookings, setBookings] = useState([])
   const [loading, setLoading] = useState(false)
   const [listLoading, setListLoading] = useState(true)

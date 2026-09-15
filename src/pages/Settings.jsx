@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
+import { getTheme, setTheme } from "../utils/themeHelpers"
 import { supabase } from "../supabase"
-import { User, Mail, Building, Save } from "lucide-react"
+import { User, Mail, Building, Save, Moon, Sun } from "lucide-react"
 import * as layout from "../styles/layout"
 
 export default function Settings() {
@@ -14,6 +15,13 @@ export default function Settings() {
     bio: "",
   })
 
+const [theme, setThemeState] = useState(getTheme())
+
+function toggleTheme() {
+  const newTheme = theme === "dark" ? "light" : "dark"
+  setTheme(newTheme)
+  setThemeState(newTheme)
+}
 useEffect(() => {
     let isMounted = true
 
@@ -125,6 +133,21 @@ useEffect(() => {
             />
           </div>
         </div>
+        <div style={styles.section}>
+          <h3 style={styles.sectionTitle}>Appearance</h3>
+
+          <div style={styles.field}>
+            <label style={styles.label}>Theme</label>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              style={styles.themeToggle}
+            >
+              {theme === "dark" ? <Moon size={16} /> : <Sun size={16} />}
+              {theme === "dark" ? "Dark Mode" : "Light Mode"}
+            </button>
+          </div>
+        </div>
 
         <button type="submit" style={styles.button} disabled={loading}>
           <Save size={16} /> {loading ? "Saving..." : "Save Changes"}
@@ -150,6 +173,7 @@ const styles = {
   inputWrapper: layout.inputWrapper,
   inputIcon: layout.inputIcon,
   input: { ...layout.input, background: "#141416" },
+  themeToggle: { display: "flex", alignItems: "center", gap: "8px", padding: "11px 16px", background: "#141416", border: "1px solid #2a2a2a", borderRadius: "8px", color: "#f5f5f5", fontSize: "14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", width: "fit-content" },
   button: { display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", padding: "13px", background: "#c9974a", border: "none", borderRadius: "8px", color: "#0a0a0a", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
   message: layout.message,
 }

@@ -17,6 +17,7 @@ export default function Dashboard() {
   const [user, setUser] = useState(null)
   const [activePage, setActivePage] = useState("dashboard")
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [startInForm, setStartInForm] = useState(false)
   const [statsLoading, setStatsLoading] = useState(true)
   const [stats, setStats] = useState({
     totalClients: 0,
@@ -170,6 +171,7 @@ export default function Dashboard() {
                 }}
                 onClick={() => {
                   setActivePage(item.label.toLowerCase())
+                  setStartInForm(false)
                   closeDrawer()
                 }}
               >
@@ -198,7 +200,7 @@ export default function Dashboard() {
             stacked in normal block flow above the page content — main
             itself has no flex-direction, so this sits above, not beside. */}
         <div className="vlt-mobile-topbar-spacer" />
-        {activePage === "bookings" && <Bookings />}
+        {activePage === "bookings" && <Bookings startInForm={startInForm} />}
         {activePage === "clients" && <Clients />}
         {activePage === "consent forms" && <ConsentForms />}
         {activePage === "payments" && <Payments />}
@@ -251,7 +253,10 @@ export default function Dashboard() {
                     <div
                       key={action.label}
                       style={{ ...styles.actionCard, borderTop: `3px solid ${action.color}` }}
-                      onClick={() => setActivePage(action.page)}
+                      onClick={() => {
+                        setActivePage(action.page)
+                      setStartInForm(true)
+                      }}
                     >
                       <div style={{ color: action.color, marginBottom: "12px" }}>
                         {action.icon}
