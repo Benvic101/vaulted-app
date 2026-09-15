@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { supabase } from "../supabase"
-import { CreditCard, User, DollarSign, Plus, ArrowLeft, TrendingUp, Wallet, Receipt, Pencil, Trash2 } from "lucide-react"
+import { CreditCard, DollarSign, Plus, ArrowLeft, TrendingUp, Wallet, Receipt, Pencil, Trash2 } from "lucide-react"
 import ClientPicker from "../components/ClientPicker"
 import * as layout from "../styles/layout"
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { supabase } from "../supabase"
-import { Users, User, Mail, Phone, FileText, Plus, ArrowLeft, Pencil, Trash2 } from "lucide-react"
+import { Users, User, Mail, Phone, Plus, ArrowLeft, Pencil, Trash2 } from "lucide-react"
 import ClientDetail from "../components/ClientDetail"
 import * as layout from "../styles/layout"
 

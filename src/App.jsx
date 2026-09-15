@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { supabase } from "./supabase"
 import Dashboard from "./pages/Dashboard"
-import { Mail, Lock, Palette } from "lucide-react"
+import { Mail, Lock } from "lucide-react"
 import logo from "./assets/logo.png"
 
 export default function App() {
