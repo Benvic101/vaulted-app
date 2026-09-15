@@ -6,8 +6,8 @@ import * as layout from "../styles/layout"
 
 const emptyForm = { client_id: null, client_name: "", amount: "", type: "deposit", method: "cash", notes: "" }
 
-export default function Payments() {
-  const [view, setView] = useState("list")
+export default function Payments({ startInForm }) {
+  const [view, setView] = useState(startInForm ? "form" : "list")
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(false)
   const [listLoading, setListLoading] = useState(true)

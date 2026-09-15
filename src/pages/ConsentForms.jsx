@@ -32,8 +32,8 @@ const EDITABLE_FIELDS = [
 const formatShortDate = (value) =>
   new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 
-export default function ConsentForms() {
-  const [view, setView] = useState("list")
+export default function ConsentForms({ startInForm }) {
+  const [view, setView] = useState(startInForm ? "form" : "list")
   const [forms, setForms] = useState([])
   const [loading, setLoading] = useState(false)
   const [listLoading, setListLoading] = useState(true)

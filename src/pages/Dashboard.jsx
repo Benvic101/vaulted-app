@@ -202,8 +202,8 @@ export default function Dashboard() {
         <div className="vlt-mobile-topbar-spacer" />
         {activePage === "bookings" && <Bookings startInForm={startInForm} />}
         {activePage === "clients" && <Clients startInForm={startInForm} />}
-        {activePage === "consent forms" && <ConsentForms />}
-        {activePage === "payments" && <Payments />}
+        {activePage === "consent forms" && <ConsentForms startInForm={startInForm} />}
+        {activePage === "payments" && <Payments startInForm={startInForm} />}
         {activePage === "settings" && <Settings />}
         {activePage === "portfolio" && <Portfolio />}
 
