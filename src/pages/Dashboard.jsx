@@ -201,7 +201,7 @@ export default function Dashboard() {
             itself has no flex-direction, so this sits above, not beside. */}
         <div className="vlt-mobile-topbar-spacer" />
         {activePage === "bookings" && <Bookings startInForm={startInForm} />}
-        {activePage === "clients" && <Clients />}
+        {activePage === "clients" && <Clients startInForm={startInForm} />}
         {activePage === "consent forms" && <ConsentForms />}
         {activePage === "payments" && <Payments />}
         {activePage === "settings" && <Settings />}

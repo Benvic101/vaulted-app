@@ -6,8 +6,8 @@ import * as layout from "../styles/layout"
 
 const emptyForm = { name: "", email: "", phone: "", notes: "" }
 
-export default function Clients() {
-  const [view, setView] = useState("list")
+export default function Clients({ startInForm }) {
+  const [view, setView] = useState(startInForm ? "form" : "list")
   const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(false)
   const [listLoading, setListLoading] = useState(true)
