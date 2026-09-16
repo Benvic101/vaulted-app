@@ -188,8 +188,8 @@ export default function ClientDetail({ client, onBack, onEdit, onDeleted }) {
               {bookings.map((b) => (
                 <div key={b.id} style={styles.row} className="vlt-card-row">
                   <div style={styles.rowDateBox}>
-                    <span style={styles.rowDay}>{parseLocalDate(b.date)(b.date).toLocaleDateString("en-US", { day: "numeric" })}</span>
-                    <span style={styles.rowMonth}>{parseLocalDate(b.date)(b.date).toLocaleDateString("en-US", { month: "short" })}</span>
+                    <span style={styles.rowDay}>{parseLocalDate(b.date).toLocaleDateString("en-US", { day: "numeric" })}</span>
+                    <span style={styles.rowMonth}>{parseLocalDate(b.date).toLocaleDateString("en-US", { month: "short" })}</span>
                   </div>
                   <div style={styles.rowInfo}>
                     <h3 style={styles.rowTitle}>{b.session_type}</h3>
