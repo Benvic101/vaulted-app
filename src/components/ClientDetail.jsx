@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { supabase } from "../supabase"
+import ListError from "./ListError"
 import { parseLocalDate } from '../utils/dateHelpers';
 
 import {
@@ -9,56 +10,68 @@ import {
 } from "lucide-react"
 
 const getBookingStatusColor = (status) => {
-  if (status === "upcoming") return "#c9974a"
-  if (status === "completed") return "#2d6a4f"
-  if (status === "cancelled") return "#8b1a1a"
-  return "#c9974a"
+  if (status === "upcoming") return "var(--accent-gold)"
+  if (status === "completed") return "var(--success-primary)"
+  if (status === "cancelled") return "var(--danger-primary)"
+  return "var(--accent-gold)"
 }
 
 const getPaymentTypeColor = (type) => {
-  if (type === "deposit") return "#c9974a"
-  if (type === "final") return "#2d6a4f"
-  if (type === "tip") return "#4c9ac9"
-  return "#c9974a"
+  if (type === "deposit") return "var(--accent-gold)"
+  if (type === "final") return "var(--success-primary)"
+  if (type === "tip") return "var(--info-primary)"
+  return "var(--accent-gold)"
 }
 
 export default function ClientDetail({ client, onBack, onEdit, onDeleted }) {
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
   const [bookings, setBookings] = useState([])
   const [payments, setPayments] = useState([])
   const [forms, setForms] = useState([])
   const [message, setMessage] = useState("")
 
-  useEffect(() => {
-    let isMounted = true
+  const loadRelated = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    setLoading(true)
+    setLoadError(null)
 
-    const loadRelated = async () => {
-      setLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
+    // Three independent queries fired together — related-data pull for one
+    // client's detail page, not a chain of dependent calls. Promise.all
+    // keeps wall-clock time to the slowest single query, and failure in
+    // one table doesn't block the other two from rendering.
+    const [bookingsRes, paymentsRes, formsRes] = await Promise.all([
+      supabase.from("bookings").select("*").eq("artist_id", user.id).eq("client_id", client.id).order("date", { ascending: false }),
+      supabase.from("payments").select("*").eq("artist_id", user.id).eq("client_id", client.id).order("paid_at", { ascending: false }),
+      supabase.from("consent_forms").select("*").eq("artist_id", user.id).eq("client_id", client.id).order("date", { ascending: false }),
+    ])
 
-      // Three independent queries fired together — related-data pull for one
-      // client's detail page, not a chain of dependent calls. Promise.all
-      // keeps wall-clock time to the slowest single query, and failure in
-      // one table doesn't block the other two from rendering.
-      const [bookingsRes, paymentsRes, formsRes] = await Promise.all([
-        supabase.from("bookings").select("*").eq("artist_id", user.id).eq("client_id", client.id).order("date", { ascending: false }),
-        supabase.from("payments").select("*").eq("artist_id", user.id).eq("client_id", client.id).order("paid_at", { ascending: false }),
-        supabase.from("consent_forms").select("*").eq("artist_id", user.id).eq("client_id", client.id).order("date", { ascending: false }),
-      ])
+    if (!isMountedRef.current) return
 
-      if (!isMounted) return
-      if (bookingsRes.error) console.error("Client detail bookings fetch error:", bookingsRes.error)
-      if (paymentsRes.error) console.error("Client detail payments fetch error:", paymentsRes.error)
-      if (formsRes.error) console.error("Client detail consent forms fetch error:", formsRes.error)
-
-      setBookings(bookingsRes.data || [])
-      setPayments(paymentsRes.data || [])
-      setForms(formsRes.data || [])
-      setLoading(false)
+    // Surface the first failure in the UI; the others still log and
+    // their data (if any) still renders — a partial load beats a blank page.
+    const firstError = bookingsRes.error || paymentsRes.error || formsRes.error
+    if (firstError) {
+      console.error("Client detail fetch error:", firstError)
+      setLoadError(firstError.message)
     }
+    if (bookingsRes.error) console.error("Client detail bookings fetch error:", bookingsRes.error)
+    if (paymentsRes.error) console.error("Client detail payments fetch error:", paymentsRes.error)
+    if (formsRes.error) console.error("Client detail consent forms fetch error:", formsRes.error)
 
+    setBookings(bookingsRes.data || [])
+    setPayments(paymentsRes.data || [])
+    setForms(formsRes.data || [])
+    setLoading(false)
+  }
+
+  const isMountedRef = useRef(true)
+
+  useEffect(() => {
+    isMountedRef.current = true
     loadRelated()
-    return () => { isMounted = false }
+    return () => { isMountedRef.current = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client.id])
 
   const handleDelete = async () => {
@@ -103,7 +116,7 @@ export default function ClientDetail({ client, onBack, onEdit, onDeleted }) {
       icon: <ClockIcon size={18} />,
     },
     { label: "Total Payments", value: payments.length, icon: <CreditCard size={18} /> },
-    { label: "Total Spent", value: `$${totalSpent.toFixed(2)}`, icon: <TrendingUp size={18} />, accent: "#2d6a4f" },
+    { label: "Total Spent", value: `$${totalSpent.toFixed(2)}`, icon: <TrendingUp size={18} />, accent: "var(--success-primary)" },
     {
       label: "Consent Forms",
       value: forms.length,
@@ -132,18 +145,18 @@ export default function ClientDetail({ client, onBack, onEdit, onDeleted }) {
             <div>
               <h1 style={styles.name}>{client.name}</h1>
               <div style={styles.metaRow}>
-                <span style={styles.metaItem}><Mail size={13} color="#6b6b6b" /> {client.email}</span>
-                {client.phone && <span style={styles.metaItem}><Phone size={13} color="#6b6b6b" /> {client.phone}</span>}
+                <span style={styles.metaItem}><Mail size={13} color="var(--text-tertiary)" /> {client.email}</span>
+                {client.phone && <span style={styles.metaItem}><Phone size={13} color="var(--text-tertiary)" /> {client.phone}</span>}
               </div>
               {client.notes && <p style={styles.notes}>{client.notes}</p>}
             </div>
           </div>
           <div style={styles.headerActions}>
             <button type="button" style={styles.iconBtnOutline} aria-label={`Edit client ${client.name}`} onClick={onEdit}>
-              <Pencil size={14} color="#8a8a8a" />
+              <Pencil size={14} color="var(--text-secondary)" />
             </button>
             <button type="button" style={styles.iconBtnOutline} aria-label={`Delete client ${client.name}`} onClick={handleDelete}>
-              <Trash2 size={14} color="#8b1a1a" />
+              <Trash2 size={14} color="var(--danger-primary)" />
             </button>
           </div>
         </div>
@@ -159,16 +172,18 @@ export default function ClientDetail({ client, onBack, onEdit, onDeleted }) {
 
       {loading ? (
         <div style={styles.emptyState}>
-          <User size={36} color="#5c5c5c" />
+          <User size={36} color="var(--text-muted)" />
           <p style={styles.emptyText}>Loading client history…</p>
         </div>
+      ) : loadError ? (
+        <ListError message={"Couldn't load client history — " + loadError} onRetry={loadRelated} />
       ) : (
         <>
           {/* Relationship Summary */}
           <div style={styles.summaryGrid} className="vlt-summary-grid">
             {summaryCards.map((card) => (
               <div key={card.label} style={styles.summaryCard}>
-                <div style={{ ...styles.summaryIcon, color: card.accent || "#c9974a" }}>{card.icon}</div>
+                <div style={{ ...styles.summaryIcon, color: card.accent || "var(--accent-gold)" }}>{card.icon}</div>
                 <p style={styles.summaryValue}>{card.value}</p>
                 <p style={styles.summaryLabel}>{card.label}</p>
                 {card.sub && <p style={styles.summarySub}>{card.sub}</p>}
@@ -180,7 +195,7 @@ export default function ClientDetail({ client, onBack, onEdit, onDeleted }) {
           <h2 style={styles.sectionTitle}>Bookings</h2>
           {bookings.length === 0 ? (
             <div style={styles.emptyState}>
-              <CalendarDays size={32} color="#222" />
+              <CalendarDays size={32} color="var(--text-tertiary)" />
               <p style={styles.emptyText}>No bookings for this client yet.</p>
             </div>
           ) : (
@@ -194,7 +209,7 @@ export default function ClientDetail({ client, onBack, onEdit, onDeleted }) {
                   <div style={styles.rowInfo}>
                     <h3 style={styles.rowTitle}>{b.session_type}</h3>
                     <p style={styles.rowMeta}>
-                      <Clock size={12} color="#6b6b6b" style={{ verticalAlign: "-2px", marginRight: "4px" }} />
+                      <Clock size={12} color="var(--text-tertiary)" style={{ verticalAlign: "-2px", marginRight: "4px" }} />
                       {b.time}{b.notes ? ` · ${b.notes}` : ""}
                     </p>
                   </div>
@@ -219,13 +234,13 @@ export default function ClientDetail({ client, onBack, onEdit, onDeleted }) {
           <h2 style={styles.sectionTitle}>Payments</h2>
           {payments.length === 0 ? (
             <div style={styles.emptyState}>
-              <CreditCard size={32} color="#222" />
+              <CreditCard size={32} color="var(--text-tertiary)" />
               <p style={styles.emptyText}>No payments recorded for this client yet.</p>
             </div>
           ) : (
             <>
               <div style={styles.totalsRow}>
-                <Wallet size={13} color="#6b6b6b" />
+                <Wallet size={13} color="var(--text-tertiary)" />
                 <span style={styles.totalsText}>${totalSpent.toFixed(2)} total across {payments.length} payment{payments.length === 1 ? "" : "s"}</span>
               </div>
               <div style={styles.list}>
@@ -258,7 +273,7 @@ export default function ClientDetail({ client, onBack, onEdit, onDeleted }) {
           <h2 style={styles.sectionTitle}>Consent Forms</h2>
           {forms.length === 0 ? (
             <div style={styles.emptyState}>
-              <FileText size={32} color="#222" />
+              <FileText size={32} color="var(--text-tertiary)" />
               <p style={styles.emptyText}>No consent forms for this client yet.</p>
             </div>
           ) : (
@@ -294,7 +309,7 @@ export default function ClientDetail({ client, onBack, onEdit, onDeleted }) {
           {/* Portfolio — placeholder: portfolio_items has no client link in the schema yet */}
           <h2 style={styles.sectionTitle}>Portfolio</h2>
           <div style={styles.emptyState}>
-            <ImageIcon size={32} color="#222" />
+            <ImageIcon size={32} color="var(--text-tertiary)" />
             <p style={styles.emptyText}>
               Portfolio pieces aren't linked to individual clients yet — this section will populate
               once that relationship exists.
@@ -308,43 +323,43 @@ export default function ClientDetail({ client, onBack, onEdit, onDeleted }) {
 
 const styles = {
   header: { marginBottom: "8px" },
-  backBtn: { display: "flex", alignItems: "center", gap: "6px", background: "transparent", border: "none", color: "#6b6b6b", fontSize: "13px", cursor: "pointer", padding: 0, marginBottom: "20px", fontFamily: "'DM Sans', sans-serif" },
+  backBtn: { display: "flex", alignItems: "center", gap: "6px", background: "transparent", border: "none", color: "var(--text-tertiary)", fontSize: "13px", cursor: "pointer", padding: 0, marginBottom: "20px", fontFamily: "'DM Sans', sans-serif" },
   headerRow: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" },
   headerLeft: { display: "flex", gap: "20px", alignItems: "flex-start" },
-  avatar: { width: "56px", height: "56px", borderRadius: "50%", background: "linear-gradient(135deg, #c9974a, #a07830)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", fontWeight: "600", color: "#0a0a0a", flexShrink: 0, fontFamily: "'Playfair Display', serif" },
-  name: { fontFamily: "'Playfair Display', serif", fontSize: "28px", color: "#f5f5f5", margin: "0 0 8px 0", fontWeight: "600" },
+  avatar: { width: "56px", height: "56px", borderRadius: "50%", background: "linear-gradient(135deg, var(--accent-gold), var(--accent-gold-dark))", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", fontWeight: "600", color: "var(--text-on-accent)", flexShrink: 0, fontFamily: "'Playfair Display', serif" },
+  name: { fontFamily: "'Playfair Display', serif", fontSize: "28px", color: "var(--text-primary)", margin: "0 0 8px 0", fontWeight: "600" },
   metaRow: { display: "flex", gap: "16px", flexWrap: "wrap" },
-  metaItem: { display: "flex", alignItems: "center", gap: "6px", color: "#888", fontSize: "13px" },
-  notes: { color: "#5c5c5c", fontSize: "13px", margin: "10px 0 0 0", fontStyle: "italic", maxWidth: "480px" },
+  metaItem: { display: "flex", alignItems: "center", gap: "6px", color: "var(--text-secondary)", fontSize: "13px" },
+  notes: { color: "var(--text-muted)", fontSize: "13px", margin: "10px 0 0 0", fontStyle: "italic", maxWidth: "480px" },
   headerActions: { display: "flex", gap: "8px" },
-  iconBtnOutline: { background: "transparent", border: "1px solid #1e1e1e", padding: "8px", cursor: "pointer", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center" },
-  message: { color: "#c9974a", fontSize: "13px", margin: "12px 0 0 0" },
-  divider: { height: "1px", background: "#1a1a1a", margin: "24px 0" },
-  legacyNote: { color: "#4a4a4a", fontSize: "12px", margin: "0 0 32px 0", lineHeight: "1.6", maxWidth: "620px" },
+  iconBtnOutline: { background: "transparent", border: "1px solid var(--border-secondary)", padding: "8px", cursor: "pointer", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center" },
+  message: { color: "var(--accent-gold)", fontSize: "13px", margin: "12px 0 0 0" },
+  divider: { height: "1px", background: "var(--border-primary)", margin: "24px 0" },
+  legacyNote: { color: "var(--text-muted)", fontSize: "12px", margin: "0 0 32px 0", lineHeight: "1.6", maxWidth: "620px" },
   summaryGrid: { display: "grid", gap: "16px", marginBottom: "48px" },
-  summaryCard: { background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "20px 24px" },
+  summaryCard: { background: "var(--bg-secondary)", border: "1px solid var(--border-primary)", borderRadius: "12px", padding: "20px 24px" },
   summaryIcon: { marginBottom: "12px" },
-  summaryValue: { color: "#f5f5f5", fontSize: "22px", fontWeight: "600", margin: "0 0 6px 0", fontFamily: "'Playfair Display', serif" },
-  summaryLabel: { color: "#6b6b6b", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", margin: 0 },
-  summarySub: { color: "#5c5c5c", fontSize: "11px", margin: "6px 0 0 0" },
-  sectionTitle: { fontFamily: "'Playfair Display', serif", fontSize: "18px", color: "#f5f5f5", fontWeight: "400", margin: "0 0 20px 0" },
+  summaryValue: { color: "var(--text-primary)", fontSize: "22px", fontWeight: "600", margin: "0 0 6px 0", fontFamily: "'Playfair Display', serif" },
+  summaryLabel: { color: "var(--text-tertiary)", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", margin: 0 },
+  summarySub: { color: "var(--text-muted)", fontSize: "11px", margin: "6px 0 0 0" },
+  sectionTitle: { fontFamily: "'Playfair Display', serif", fontSize: "18px", color: "var(--text-primary)", fontWeight: "400", margin: "0 0 20px 0" },
   list: { display: "flex", flexDirection: "column", gap: "12px", marginBottom: "48px" },
-  row: { display: "flex", gap: "20px", background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "18px 22px" },
-  rowDateBox: { display: "flex", flexDirection: "column", alignItems: "center", background: "rgba(201,151,74,0.05)", border: "1px solid rgba(201,151,74,0.1)", borderRadius: "10px", padding: "10px 14px", minWidth: "50px" },
-  rowDay: { color: "#c9974a", fontSize: "18px", fontWeight: "600", fontFamily: "'Playfair Display', serif" },
-  rowMonth: { color: "#555", fontSize: "10px", textTransform: "uppercase", letterSpacing: "1px" },
+  row: { display: "flex", gap: "20px", background: "var(--bg-secondary)", border: "1px solid var(--border-primary)", borderRadius: "12px", padding: "18px 22px" },
+  rowDateBox: { display: "flex", flexDirection: "column", alignItems: "center", background: "var(--warning-bg-subtle)", border: "1px solid var(--warning-border-subtle)", borderRadius: "10px", padding: "10px 14px", minWidth: "50px" },
+  rowDay: { color: "var(--accent-gold)", fontSize: "18px", fontWeight: "600", fontFamily: "'Playfair Display', serif" },
+  rowMonth: { color: "var(--text-muted)", fontSize: "10px", textTransform: "uppercase", letterSpacing: "1px" },
   rowInfo: { flex: 1 },
-  rowTitle: { color: "#f5f5f5", fontSize: "15px", margin: "0 0 4px 0", fontWeight: "500" },
-  rowMeta: { color: "#6b6b6b", fontSize: "13px", margin: 0 },
+  rowTitle: { color: "var(--text-primary)", fontSize: "15px", margin: "0 0 4px 0", fontWeight: "500" },
+  rowMeta: { color: "var(--text-tertiary)", fontSize: "13px", margin: 0 },
   rowRight: {},
-  rowPrice: { color: "#f5f5f5", fontSize: "17px", fontWeight: "600", margin: "0 0 2px 0", fontFamily: "'Playfair Display', serif" },
-  rowSub: { color: "#6b6b6b", fontSize: "12px", margin: 0 },
+  rowPrice: { color: "var(--text-primary)", fontSize: "17px", fontWeight: "600", margin: "0 0 2px 0", fontFamily: "'Playfair Display', serif" },
+  rowSub: { color: "var(--text-tertiary)", fontSize: "12px", margin: 0 },
   statusBadge: { display: "inline-block", padding: "3px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" },
-  signedBadge: { display: "inline-flex", alignItems: "center", gap: "6px", padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", background: "rgba(45,106,79,0.15)", color: "#2d6a4f", border: "1px solid rgba(45,106,79,0.2)", marginBottom: "8px" },
-  sentBadge: { display: "inline-flex", alignItems: "center", gap: "6px", padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", background: "rgba(201,151,74,0.12)", color: "#c9974a", border: "1px solid rgba(201,151,74,0.25)", marginBottom: "8px" },
-  editedBadge: { display: "inline-flex", alignItems: "center", padding: "3px 10px", borderRadius: "20px", fontSize: "10px", fontWeight: "600", background: "#141416", color: "#7a7a7a", border: "1px solid #1e1e1e", marginBottom: "8px" },
+  signedBadge: { display: "inline-flex", alignItems: "center", gap: "6px", padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", background: "var(--success-bg)", color: "var(--success-primary)", border: "1px solid var(--success-border)", marginBottom: "8px" },
+  sentBadge: { display: "inline-flex", alignItems: "center", gap: "6px", padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", background: "var(--warning-bg)", color: "var(--warning-primary)", border: "1px solid var(--warning-border)", marginBottom: "8px" },
+  editedBadge: { display: "inline-flex", alignItems: "center", padding: "3px 10px", borderRadius: "20px", fontSize: "10px", fontWeight: "600", background: "var(--bg-tertiary)", color: "var(--text-secondary)", border: "1px solid var(--border-secondary)", marginBottom: "8px" },
   totalsRow: { display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" },
-  totalsText: { color: "#888", fontSize: "13px" },
-  emptyState: { background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "40px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", marginBottom: "48px" },
-  emptyText: { color: "#5c5c5c", fontSize: "13px", margin: 0, maxWidth: "420px" },
+  totalsText: { color: "var(--text-secondary)", fontSize: "13px" },
+  emptyState: { background: "var(--bg-secondary)", border: "1px solid var(--border-primary)", borderRadius: "12px", padding: "40px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", marginBottom: "48px" },
+  emptyText: { color: "var(--text-muted)", fontSize: "13px", margin: 0, maxWidth: "420px" },
 }

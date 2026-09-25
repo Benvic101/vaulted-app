@@ -3,8 +3,10 @@ import { supabase } from "../supabase"
 import { FileText, Mail, CalendarDays, Plus, ArrowLeft, CheckSquare, Send, Link2, Copy, Check, Clock, Pencil, Trash2, User } from "lucide-react"
 import ClientPicker from "../components/ClientPicker"
 import ConfirmDeleteDialog from "../components/ConfirmDeleteDialog"
+import ListError from "../components/ListError"
 import * as layout from "../styles/layout"
 import { parseLocalDate } from "../utils/dateHelpers"
+import { copyToClipboard } from "../utils/copyToClipboard"
 
 const emptyForm = {
   client_id: null, client_name: "", client_email: "", date: "",
@@ -33,11 +35,27 @@ const EDITABLE_FIELDS = [
 const formatShortDate = (value) =>
   new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 
+const CheckBox = ({ name, label, required, checked, onChange }) => (
+  <label style={styles.checkboxLabel}>
+    <input
+      type="checkbox"
+      name={name}
+      checked={checked}
+      onChange={onChange}
+      style={styles.checkbox}
+    />
+    <span style={styles.checkboxText}>
+      {label} {required && <span style={{ color: "var(--danger-primary)" }}>*</span>}
+    </span>
+  </label>
+)
+
 export default function ConsentForms({ startInForm }) {
   const [view, setView] = useState(startInForm ? "form" : "list")
   const [forms, setForms] = useState([])
   const [loading, setLoading] = useState(false)
   const [listLoading, setListLoading] = useState(true)
+  const [listError, setListError] = useState(null)
   const [message, setMessage] = useState("")
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState(null)
@@ -53,20 +71,31 @@ export default function ConsentForms({ startInForm }) {
   // outcomes (copied, fell back to manual-select, failed entirely) are
   // mutually exclusive and each gets distinct feedback.
   const [copyState, setCopyState] = useState("idle")
+  // Per-row copy feedback on the list, keyed by form id — same outcome set
+  // as copyState, but scoped so each row shows its own "Copied" tick.
+  const [rowCopyState, setRowCopyState] = useState({})
   const linkTextRef = useRef(null)
 
-  useEffect(() => { fetchForms() }, [])
 
   const fetchForms = async () => {
     setListLoading(true)
+    setListError(null)
     const { data: { user } } = await supabase.auth.getUser()
     const { data, error } = await supabase
       .from("consent_forms")
       .select("*")
       .eq("artist_id", user.id)
-    if (!error) setForms(data)
+      .order("date", { ascending: false })
+    if (error) {
+      console.error("Consent forms fetch error:", error)
+      setListError(error.message)
+    } else {
+      setForms(data)
+    }
     setListLoading(false)
   }
+
+    useEffect(() => { fetchForms() }, [])
 
   const handleChange = (e) => {
     const value = e.target.type === "checkbox" ? e.target.checked : e.target.value
@@ -156,6 +185,7 @@ export default function ConsentForms({ startInForm }) {
     fetchForms()
     setTimeout(() => backToList(), 1200)
   }
+  useEffect(() => { fetchForms() }, [])
 
   const deleteForm = async (f) => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -319,70 +349,29 @@ export default function ConsentForms({ startInForm }) {
     setView("send")
   }
 
-  // Tiered copy. Tier 1: async Clipboard API — secure contexts (HTTPS or
-  // localhost) only; guarded rather than trusted because some browsers
-  // expose the object but reject on insecure origins. Tier 2: deprecated-
-  // but-still-working execCommand('copy') on a hidden textarea, which does
-  // work over plain-HTTP LAN (e.g. phone testing against a dev server) as
-  // long as it runs inside this click handler; its boolean return is
-  // checked explicitly since it reports failure by returning false, not by
-  // throwing. Tier 3: pre-select the visible link text so the artist only
-  // has to long-press/Ctrl+C. Each tier's outcome sets distinct feedback —
-  // never silent.
+  // Copy from the "Link Ready" screen — the visible link text acts as the
+  // manual-select fallback. Outcomes live in copyState; see its declaration.
   const copySentLink = async () => {
-    try {
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(sentLink)
-        setCopyState("copied")
-        setTimeout(() => setCopyState("idle"), 2000)
-        return
-      }
-      const textarea = document.createElement("textarea")
-      textarea.value = sentLink
-      textarea.style.position = "fixed"
-      textarea.style.opacity = "0"
-      document.body.appendChild(textarea)
-      textarea.focus()
-      textarea.select()
-      const ok = document.execCommand("copy")
-      document.body.removeChild(textarea)
-      if (ok) {
-        setCopyState("copied")
-        setTimeout(() => setCopyState("idle"), 2000)
-        return
-      }
-    } catch {
-      // fall through to manual-select below
-    }
-    // Manual-select tier: highlight the full URL for the user. The span is
-    // ellipsis-truncated, so the highlight shows on the clipped portion,
-    // but the selection (and anything copied from it) is the full link.
-    try {
-      const range = document.createRange()
-      range.selectNodeContents(linkTextRef.current)
-      const selection = window.getSelection()
-      selection.removeAllRanges()
-      selection.addRange(range)
-      setCopyState("manual")
-    } catch {
-      setCopyState("failed")
+    const result = await copyToClipboard(sentLink, linkTextRef.current)
+    setCopyState(result)
+    if (result === "copied") setTimeout(() => setCopyState("idle"), 2000)
+  }
+
+  // Copy from a list row. There's no visible link text here, so no manual-
+  // select fallback — failure just says so. Signed/draft forms get no button,
+  // so this only fires for awaiting-signature rows whose token still resolves.
+  const copyRowLink = async (f) => {
+    const link = `${window.location.origin}/sign/${f.sign_token}`
+    const result = await copyToClipboard(link)
+    setRowCopyState((s) => ({ ...s, [f.id]: result }))
+    if (result === "copied") {
+      setTimeout(() => {
+        setRowCopyState((s) => ({ ...s, [f.id]: "idle" }))
+      }, 2000)
     }
   }
 
-  const CheckBox = ({ name, label, required }) => (
-    <label style={styles.checkboxLabel}>
-      <input
-        type="checkbox"
-        name={name}
-        checked={form[name]}
-        onChange={handleChange}
-        style={styles.checkbox}
-      />
-      <span style={styles.checkboxText}>
-        {label} {required && <span style={{ color: "#8b1a1a" }}>*</span>}
-      </span>
-    </label>
-  )
+
 
   return (
     <div style={styles.container} className="vlt-page-shell">
@@ -437,7 +426,7 @@ export default function ConsentForms({ startInForm }) {
                 <div style={styles.field}>
                   <label style={styles.label}>Client Email *</label>
                   <div style={styles.inputWrapper}>
-                    <Mail size={15} color="#6b6b6b" style={styles.inputIcon} />
+                    <Mail size={15} color="var(--text-tertiary)" style={styles.inputIcon} />
                     <input
                       style={styles.input}
                       placeholder="email@example.com"
@@ -449,7 +438,7 @@ export default function ConsentForms({ startInForm }) {
                 <div style={styles.field}>
                   <label style={styles.label}>Appointment Date *</label>
                   <div style={styles.inputWrapper}>
-                    <CalendarDays size={15} color="#6b6b6b" style={styles.inputIcon} />
+                    <CalendarDays size={15} color="var(--text-tertiary)" style={styles.inputIcon} />
                     <input
                       style={styles.input}
                       type="date"
@@ -473,7 +462,7 @@ export default function ConsentForms({ startInForm }) {
                 It can only be used once.
               </p>
               <div style={styles.linkRow}>
-                <Link2 size={15} color="#6b6b6b" style={{ flexShrink: 0 }} />
+                <Link2 size={15} color="var(--text-tertiary)" style={{ flexShrink: 0 }} />
                 <span ref={linkTextRef} style={styles.linkText}>{sentLink}</span>
                 <button type="button" style={styles.copyBtn} onClick={copySentLink}>
                   {copyState === "copied" ? <Check size={14} /> : <Copy size={14} />}
@@ -519,7 +508,7 @@ export default function ConsentForms({ startInForm }) {
                   // Locked on purpose: an already-sent signing link cannot be
                   // re-pointed at a different client. Send that client a new form.
                   <div style={styles.lockedField}>
-                    <User size={15} color="#6b6b6b" />
+                    <User size={15} color="var(--text-tertiary)" />
                     <span style={styles.lockedValue}>{form.client_name}</span>
                     <span style={styles.lockedHint}>can't be changed</span>
                   </div>
@@ -538,7 +527,7 @@ export default function ConsentForms({ startInForm }) {
               <div style={styles.field}>
                 <label style={styles.label}>Email *</label>
                 <div style={styles.inputWrapper}>
-                  <Mail size={15} color="#6b6b6b" style={styles.inputIcon} />
+                  <Mail size={15} color="var(--text-tertiary)" style={styles.inputIcon} />
                   <input style={styles.input} name="client_email" placeholder="email@example.com" value={form.client_email} onChange={handleChange} />
                 </div>
               </div>
@@ -546,7 +535,7 @@ export default function ConsentForms({ startInForm }) {
             <div style={styles.field}>
               <label style={styles.label}>Appointment Date *</label>
               <div style={styles.inputWrapper}>
-                <CalendarDays size={15} color="#6b6b6b" style={styles.inputIcon} />
+                <CalendarDays size={15} color="var(--text-tertiary)" style={styles.inputIcon} />
                 <input style={styles.input} name="date" type="date" value={form.date} onChange={handleChange} />
               </div>
             </div>
@@ -557,12 +546,12 @@ export default function ConsentForms({ startInForm }) {
             <h3 style={styles.sectionTitle}>Medical History</h3>
             <p style={styles.sectionSub}>Check all conditions that apply</p>
             <div style={styles.checkboxGrid} className="vlt-form-grid">
-              <CheckBox name="blood_thinner" label="Takes blood thinners" />
-              <CheckBox name="skin_condition" label="Has skin condition" />
-              <CheckBox name="allergies" label="Has allergies" />
-              <CheckBox name="pregnant" label="Is pregnant" />
-              <CheckBox name="diabetes" label="Has diabetes" />
-              <CheckBox name="heart_condition" label="Has heart condition" />
+              <CheckBox name="blood_thinner" label="Takes blood thinners" checked={form.blood_thinner} onChange={handleChange} />
+              <CheckBox name="skin_condition" label="Has skin condition" checked={form.skin_condition} onChange={handleChange} />
+              <CheckBox name="allergies" label="Has allergies" checked={form.allergies} onChange={handleChange} />
+              <CheckBox name="pregnant" label="Is pregnant" checked={form.pregnant} onChange={handleChange} />
+              <CheckBox name="diabetes" label="Has diabetes" checked={form.diabetes} onChange={handleChange} />
+              <CheckBox name="heart_condition" label="Has heart condition" checked={form.heart_condition} onChange={handleChange} />
             </div>
             {form.allergies && (
               <div style={{ ...styles.field, marginTop: "16px" }}>
@@ -583,10 +572,10 @@ export default function ConsentForms({ startInForm }) {
                 the client will re-confirm these themselves — checking them here has no effect on that path.
               </p>
               <div style={styles.consentList}>
-                <CheckBox name="age_verified" label="I confirm I am 18 years or older" required />
-                <CheckBox name="design_approved" label="I have reviewed and approved the design" required />
-                <CheckBox name="aftercare_acknowledged" label="I have read and understood aftercare instructions" required />
-                <CheckBox name="photo_consent" label="I consent to photos being used for portfolio purposes" />
+                <CheckBox name="age_verified" label="I confirm I am 18 years or older" required checked={form.age_verified} onChange={handleChange} />
+                <CheckBox name="design_approved" label="I have reviewed and approved the design" required checked={form.design_approved} onChange={handleChange} />
+                <CheckBox name="aftercare_acknowledged" label="I have read and understood aftercare instructions" required checked={form.aftercare_acknowledged} onChange={handleChange} />
+                <CheckBox name="photo_consent" label="I consent to photos being used for portfolio purposes" checked={form.photo_consent} onChange={handleChange} />
               </div>
             </div>
           )}
@@ -628,12 +617,14 @@ export default function ConsentForms({ startInForm }) {
         <div>
           {listLoading ? (
             <div style={styles.emptyState}>
-              <FileText size={36} color="#5c5c5c" />
+              <FileText size={36} color="var(--text-muted)" />
               <p style={styles.emptyText}>Loading consent forms…</p>
             </div>
+          ) : listError ? (
+            <ListError message={"Couldn't load consent forms — " + listError} onRetry={fetchForms} />
           ) : forms.length === 0 ? (
             <div style={styles.emptyState}>
-              <FileText size={36} color="#222" />
+              <FileText size={36} color="var(--text-tertiary)" />
               <p style={styles.emptyText}>No consent forms yet. Create your first one!</p>
             </div>
           ) : (
@@ -641,13 +632,13 @@ export default function ConsentForms({ startInForm }) {
               {forms.map((f) => (
                 <div key={f.id} style={styles.formCard} className="vlt-card-row">
                   <div style={styles.formIconBox}>
-                    <FileText size={20} color="#c9974a" />
+                    <FileText size={20} color="var(--accent-gold)" />
                   </div>
                   <div style={styles.formInfo}>
                     <h3 style={styles.formName}>{f.client_name}</h3>
                     <div style={styles.formMeta}>
-                      <span style={styles.formMetaItem}><Mail size={12} color="#6b6b6b" /> {f.client_email}</span>
-                      <span style={styles.formMetaItem}><CalendarDays size={12} color="#6b6b6b" /> {parseLocalDate(f.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                      <span style={styles.formMetaItem}><Mail size={12} color="var(--text-tertiary)" /> {f.client_email}</span>
+                      <span style={styles.formMetaItem}><CalendarDays size={12} color="var(--text-tertiary)" /> {parseLocalDate(f.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
                     </div>
                   </div>
                   <div style={styles.formRight} className="vlt-card-right">
@@ -677,6 +668,25 @@ export default function ConsentForms({ startInForm }) {
                   </div>
 
                   <div style={styles.rowActions} className="vlt-card-actions">
+                    {/* Retrieval for a sent-but-unsigned link. Only shown for
+                        the "sent" state: signed forms have no reason to
+                        re-expose the link, and a draft (which nothing creates
+                        today) has no token handed out yet. */}
+                    {f.status === "sent" && (
+                      <button
+                        type="button"
+                        style={styles.iconBtn}
+                        className="vlt-icon-btn"
+                        aria-label={`Copy signing link for ${f.client_name}`}
+                        onClick={() => copyRowLink(f)}
+                      >
+                        {rowCopyState[f.id] === "copied" ? (
+                          <Check size={14} color="var(--success-primary)" />
+                        ) : (
+                          <Link2 size={14} color="var(--text-secondary)" />
+                        )}
+                      </button>
+                    )}
                     {/* No edit control for signed forms — content, answers and
                         signature are immutable once signed. */}
                     {f.status !== "signed" && (
@@ -687,7 +697,7 @@ export default function ConsentForms({ startInForm }) {
                         aria-label={`Edit consent form for ${f.client_name}`}
                         onClick={() => openEdit(f)}
                       >
-                        <Pencil size={14} color="#8a8a8a" />
+                        <Pencil size={14} color="var(--text-secondary)" />
                       </button>
                     )}
                     <button
@@ -697,7 +707,7 @@ export default function ConsentForms({ startInForm }) {
                       aria-label={`Delete consent form for ${f.client_name}`}
                       onClick={() => handleDelete(f)}
                     >
-                      <Trash2 size={14} color="#8b1a1a" />
+                      <Trash2 size={14} color="var(--danger-primary)" />
                     </button>
                   </div>
                 </div>
@@ -729,53 +739,53 @@ const styles = {
   headerSub: layout.headerSub,
   headerTitle: layout.headerTitle,
   newBtn: layout.newBtn,
-  newBtnOutline: { display: "flex", alignItems: "center", gap: "8px", padding: "10px 20px", background: "transparent", border: "1px solid #2a2a2a", borderRadius: "8px", color: "#f5f5f5", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+  newBtnOutline: { display: "flex", alignItems: "center", gap: "8px", padding: "10px 20px", background: "transparent", border: "1px solid var(--border-tertiary)", borderRadius: "8px", color: "var(--text-primary)", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
   divider: layout.divider,
   form: { display: "flex", flexDirection: "column", gap: "24px", maxWidth: "700px" },
-  section: { background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "24px", display: "flex", flexDirection: "column", gap: "16px" },
-  sectionTitle: { fontFamily: "'Playfair Display', serif", color: "#f5f5f5", fontSize: "16px", margin: 0, fontWeight: "400" },
-  sectionSub: { color: "#6b6b6b", fontSize: "12px", margin: 0 },
+  section: { background: "var(--bg-secondary)", border: "1px solid var(--border-primary)", borderRadius: "12px", padding: "24px", display: "flex", flexDirection: "column", gap: "16px" },
+  sectionTitle: { fontFamily: "'Playfair Display', serif", color: "var(--text-primary)", fontSize: "16px", margin: 0, fontWeight: "400" },
+  sectionSub: { color: "var(--text-tertiary)", fontSize: "12px", margin: 0 },
   formGrid: layout.formGrid,
   field: layout.field,
   label: layout.label,
   inputWrapper: layout.inputWrapper,
   inputIcon: layout.inputIcon,
-  input: { ...layout.input, background: "#141416" },
+  input: { ...layout.input, background: "var(--bg-tertiary)" },
   checkboxGrid: { display: "grid", gap: "12px" },
   consentList: { display: "flex", flexDirection: "column", gap: "12px" },
   checkboxLabel: { display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" },
-  checkbox: { width: "16px", height: "16px", cursor: "pointer", accentColor: "#c9974a" },
-  checkboxText: { color: "#888", fontSize: "14px" },
+  checkbox: { width: "16px", height: "16px", cursor: "pointer", accentColor: "var(--accent-gold)" },
+  checkboxText: { color: "var(--text-secondary)", fontSize: "14px" },
   button: layout.button,
-  buttonOutline: { padding: "13px", background: "transparent", border: "1px solid #2a2a2a", borderRadius: "8px", color: "#f5f5f5", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+  buttonOutline: { padding: "13px", background: "transparent", border: "1px solid var(--border-tertiary)", borderRadius: "8px", color: "var(--text-primary)", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
   message: layout.message,
   emptyState: layout.emptyState,
   emptyText: layout.emptyText,
   formsList: { display: "flex", flexDirection: "column", gap: "12px" },
-  formCard: { display: "flex", gap: "20px", background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "20px 24px" },
-  formIconBox: { width: "44px", height: "44px", borderRadius: "10px", background: "rgba(201,151,74,0.05)", border: "1px solid rgba(201,151,74,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  formCard: { display: "flex", gap: "20px", background: "var(--bg-secondary)", border: "1px solid var(--border-primary)", borderRadius: "12px", padding: "20px 24px" },
+  formIconBox: { width: "44px", height: "44px", borderRadius: "10px", background: "var(--warning-bg-subtle)", border: "1px solid var(--warning-border-subtle)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
   formInfo: { flex: 1 },
-  formName: { color: "#f5f5f5", fontSize: "16px", margin: "0 0 8px 0", fontWeight: "500" },
+  formName: { color: "var(--text-primary)", fontSize: "16px", margin: "0 0 8px 0", fontWeight: "500" },
   formMeta: { display: "flex", gap: "16px" },
-  formMetaItem: { display: "flex", alignItems: "center", gap: "6px", color: "#6b6b6b", fontSize: "13px" },
+  formMetaItem: { display: "flex", alignItems: "center", gap: "6px", color: "var(--text-tertiary)", fontSize: "13px" },
   formRight: {},
   rowActions: layout.rowActions,
   iconBtn: layout.iconBtn,
-  editNotice: { background: "rgba(201,151,74,0.05)", border: "1px solid rgba(201,151,74,0.15)", borderRadius: "8px", padding: "14px 18px", color: "#a8894f", fontSize: "13px", lineHeight: "1.6" },
-  lockedField: { display: "flex", alignItems: "center", gap: "8px", padding: "12px 16px", background: "#141416", border: "1px solid #1a1a1a", borderRadius: "8px", boxSizing: "border-box" },
-  lockedValue: { flex: 1, minWidth: 0, color: "#f5f5f5", fontSize: "16px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
-  lockedHint: { color: "#555", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0 },
-  editedBadge: { display: "inline-flex", alignItems: "center", gap: "5px", padding: "3px 10px", borderRadius: "20px", fontSize: "10px", fontWeight: "600", background: "#141416", color: "#7a7a7a", border: "1px solid #1e1e1e", marginBottom: "8px" },
+  editNotice: { background: "var(--warning-bg-subtle)", border: "1px solid var(--warning-border-light)", borderRadius: "8px", padding: "14px 18px", color: "var(--accent-gold)", fontSize: "13px", lineHeight: "1.6" },
+  lockedField: { display: "flex", alignItems: "center", gap: "8px", padding: "12px 16px", background: "var(--bg-tertiary)", border: "1px solid var(--border-primary)", borderRadius: "8px", boxSizing: "border-box" },
+  lockedValue: { flex: 1, minWidth: 0, color: "var(--text-primary)", fontSize: "16px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  lockedHint: { color: "var(--text-muted)", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0 },
+  editedBadge: { display: "inline-flex", alignItems: "center", gap: "5px", padding: "3px 10px", borderRadius: "20px", fontSize: "10px", fontWeight: "600", background: "var(--bg-tertiary)", color: "var(--text-secondary)", border: "1px solid var(--border-secondary)", marginBottom: "8px" },
   // 'draft' is permitted by the status CHECK constraint but nothing in the app
   // creates one today. Rendered distinctly rather than silently falling into
   // the "Awaiting Signature" branch, which would misreport an unsent form.
-  draftBadge: { display: "inline-flex", alignItems: "center", gap: "6px", padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", background: "#141416", color: "#8a8a8a", border: "1px solid #232323", marginBottom: "8px" },
-  signedBadge: { display: "inline-flex", alignItems: "center", gap: "6px", padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", background: "rgba(45,106,79,0.15)", color: "#2d6a4f", border: "1px solid rgba(45,106,79,0.2)", marginBottom: "8px" },
-  sentBadge: { display: "inline-flex", alignItems: "center", gap: "6px", padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", background: "rgba(201,151,74,0.12)", color: "#c9974a", border: "1px solid rgba(201,151,74,0.25)", marginBottom: "8px" },
-  formDate: { color: "#6b6b6b", fontSize: "12px", margin: 0 },
-  linkRow: { display: "flex", alignItems: "center", gap: "10px", background: "#141416", border: "1px solid #1a1a1a", borderRadius: "8px", padding: "12px 16px" },
-  linkText: { flex: 1, minWidth: 0, color: "#ccc", fontSize: "13px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
-  copyBtn: { display: "flex", alignItems: "center", gap: "6px", background: "#c9974a", border: "none", borderRadius: "6px", padding: "8px 12px", color: "#0a0a0a", fontSize: "12px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", flexShrink: 0 },
-  copyManualText: { color: "#c9974a", fontSize: "12px", margin: "-4px 0 0 0", lineHeight: "1.5" },
-  copyErrorText: { color: "#8b1a1a", fontSize: "12px", margin: "-4px 0 0 0", lineHeight: "1.5" },
+  draftBadge: { display: "inline-flex", alignItems: "center", gap: "6px", padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", background: "var(--bg-tertiary)", color: "var(--text-secondary)", border: "1px solid var(--border-tertiary)", marginBottom: "8px" },
+  signedBadge: { display: "inline-flex", alignItems: "center", gap: "6px", padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", background: "var(--success-bg)", color: "var(--success-primary)", border: "1px solid var(--success-border)", marginBottom: "8px" },
+  sentBadge: { display: "inline-flex", alignItems: "center", gap: "6px", padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", background: "var(--warning-bg)", color: "var(--warning-primary)", border: "1px solid var(--warning-border)", marginBottom: "8px" },
+  formDate: { color: "var(--text-tertiary)", fontSize: "12px", margin: 0 },
+  linkRow: { display: "flex", alignItems: "center", gap: "10px", background: "var(--bg-tertiary)", border: "1px solid var(--border-primary)", borderRadius: "8px", padding: "12px 16px" },
+  linkText: { flex: 1, minWidth: 0, color: "var(--text-secondary)", fontSize: "13px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  copyBtn: { display: "flex", alignItems: "center", gap: "6px", background: "var(--accent-gold)", border: "none", borderRadius: "6px", padding: "8px 12px", color: "var(--text-on-accent)", fontSize: "12px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", flexShrink: 0 },
+  copyManualText: { color: "var(--accent-gold)", fontSize: "12px", margin: "-4px 0 0 0", lineHeight: "1.5" },
+  copyErrorText: { color: "var(--danger-primary)", fontSize: "12px", margin: "-4px 0 0 0", lineHeight: "1.5" },
 }

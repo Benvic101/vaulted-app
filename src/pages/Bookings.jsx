@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react"
 import { supabase } from "../supabase"
 import { CalendarDays, Clock, Mail, FileText, Plus, ArrowLeft, DollarSign, Pencil, Trash2, CheckSquare, XCircle, ChevronDown } from "lucide-react"
 import ClientPicker from "../components/ClientPicker"
+import ListError from "../components/ListError"
 import * as layout from "../styles/layout"
 import { parseLocalDate } from '../utils/dateHelpers';
 const STATUS_OPTIONS = ["upcoming", "completed", "cancelled"]
@@ -22,6 +23,7 @@ export default function Bookings({ startInForm }) {
   const [bookings, setBookings] = useState([])
   const [loading, setLoading] = useState(false)
   const [listLoading, setListLoading] = useState(true)
+  const [listError, setListError] = useState(null)
   const [message, setMessage] = useState("")
   const [editingId, setEditingId] = useState(null)
   const [statusMenuId, setStatusMenuId] = useState(null)
@@ -38,10 +40,6 @@ export default function Bookings({ startInForm }) {
   ]
 
   useEffect(() => {
-    fetchBookings()
-  }, [])
-
-  useEffect(() => {
     const onDoc = (e) => {
       if (statusMenuRef.current && !statusMenuRef.current.contains(e.target)) setStatusMenuId(null)
     }
@@ -51,16 +49,26 @@ export default function Bookings({ startInForm }) {
 
   const fetchBookings = async () => {
     setListLoading(true)
+    setListError(null)
     const { data: { user } } = await supabase.auth.getUser()
     const { data, error } = await supabase
       .from("bookings")
       .select("*")
       .eq("artist_id", user.id)
       .order("date", { ascending: true })
-    if (!error) setBookings(data)
+    if (error) {
+      console.error("Bookings fetch error:", error)
+      setListError(error.message)
+    } else {
+      setBookings(data)
+    }
     setListLoading(false)
   }
 
+    useEffect(() => {
+    fetchBookings()
+  }, [])
+  
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value })
   }
@@ -200,10 +208,10 @@ export default function Bookings({ startInForm }) {
   }
 
   const getStatusColor = (status) => {
-    if (status === "upcoming") return "#c9974a"
-    if (status === "completed") return "#2d6a4f"
-    if (status === "cancelled") return "#8b1a1a"
-    return "#c9974a"
+    if (status === "upcoming") return "var(--accent-gold)"
+    if (status === "completed") return "var(--success-primary)"
+    if (status === "cancelled") return "var(--danger-primary)"
+    return "var(--accent-gold)"
   }
 
   const getStatusIcon = (status) => {
@@ -257,7 +265,7 @@ export default function Bookings({ startInForm }) {
             <div style={styles.field}>
               <label style={styles.label}>Client Email</label>
               <div style={styles.inputWrapper}>
-                <Mail size={15} color="#6b6b6b" style={styles.inputIcon} />
+                <Mail size={15} color="var(--text-tertiary)" style={styles.inputIcon} />
                 <input style={styles.input} name="client_email" placeholder="e.g. john@email.com" value={form.client_email} onChange={handleChange} />
               </div>
             </div>
@@ -266,7 +274,7 @@ export default function Bookings({ startInForm }) {
           <div style={styles.field}>
             <label style={styles.label}>Session Type *</label>
             <div style={styles.inputWrapper}>
-              <FileText size={15} color="#6b6b6b" style={styles.inputIcon} />
+              <FileText size={15} color="var(--text-tertiary)" style={styles.inputIcon} />
               <select style={styles.input} name="session_type" value={form.session_type} onChange={handleChange}>
                 {sessionTypes.map((type) => (
                   <option key={type} value={type}>{type}</option>
@@ -279,14 +287,14 @@ export default function Bookings({ startInForm }) {
             <div style={styles.field}>
               <label style={styles.label}>Date *</label>
               <div style={styles.inputWrapper}>
-                <CalendarDays size={15} color="#6b6b6b" style={styles.inputIcon} />
+                <CalendarDays size={15} color="var(--text-tertiary)" style={styles.inputIcon} />
                 <input style={styles.input} name="date" type="date" min={today} value={form.date} onChange={handleChange} />
               </div>
             </div>
             <div style={styles.field}>
               <label style={styles.label}>Time *</label>
               <div style={styles.inputWrapper}>
-                <Clock size={15} color="#6b6b6b" style={styles.inputIcon} />
+                <Clock size={15} color="var(--text-tertiary)" style={styles.inputIcon} />
                 <input style={styles.input} name="time" type="time" value={form.time} onChange={handleChange} />
               </div>
             </div>
@@ -295,7 +303,7 @@ export default function Bookings({ startInForm }) {
           <div style={styles.field}>
             <label style={styles.label}>Estimated Price ($) *</label>
             <div style={styles.inputWrapper}>
-              <DollarSign size={15} color="#6b6b6b" style={styles.inputIcon} />
+              <DollarSign size={15} color="var(--text-tertiary)" style={styles.inputIcon} />
               <input style={styles.input} name="price" type="number" placeholder="e.g. 200" value={form.price} onChange={handleChange} />
             </div>
           </div>
@@ -332,12 +340,14 @@ export default function Bookings({ startInForm }) {
           {message && <p style={{ ...styles.message, textAlign: "left", marginBottom: "16px" }}>{message}</p>}
           {listLoading ? (
             <div style={styles.emptyState}>
-              <CalendarDays size={36} color="#5c5c5c" />
+              <CalendarDays size={36} color="var(--text-muted)" />
               <p style={styles.emptyText}>Loading bookings…</p>
             </div>
+          ) : listError ? (
+            <ListError message={"Couldn't load bookings — " + listError} onRetry={fetchBookings} />
           ) : bookings.length === 0 ? (
             <div style={styles.emptyState}>
-              <CalendarDays size={36} color="#222" />
+              <CalendarDays size={36} color="var(--text-tertiary)" />
               <p style={styles.emptyText}>No bookings yet. Create your first one!</p>
             </div>
           ) : (
@@ -419,7 +429,7 @@ export default function Bookings({ startInForm }) {
                       aria-label={`Edit booking for ${booking.client_name}`}
                       onClick={() => openEdit(booking)}
                     >
-                      <Pencil size={14} color="#8a8a8a" />
+                      <Pencil size={14} color="var(--text-secondary)" />
                     </button>
                     <button
                       type="button"
@@ -428,7 +438,7 @@ export default function Bookings({ startInForm }) {
                       aria-label={`Delete booking for ${booking.client_name}`}
                       onClick={() => handleDelete(booking)}
                     >
-                      <Trash2 size={14} color="#8b1a1a" />
+                      <Trash2 size={14} color="var(--danger-primary)" />
                     </button>
                   </div>
                 </div>
@@ -454,29 +464,29 @@ const styles = {
   label: layout.label,
   inputWrapper: layout.inputWrapper,
   inputIcon: layout.inputIcon,
-  input: { ...layout.input, background: "#0f0f10" },
-  depositBox: { display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(201,151,74,0.05)", border: "1px solid rgba(201,151,74,0.15)", borderRadius: "8px", padding: "16px 20px" },
-  depositLabel: { color: "#666", fontSize: "13px" },
-  depositValue: { color: "#c9974a", fontSize: "24px", fontFamily: "'Playfair Display', serif" },
+  input: { ...layout.input, background: "var(--bg-secondary)" },
+  depositBox: { display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--warning-bg-subtle)", border: "1px solid var(--warning-border)", borderRadius: "8px", padding: "16px 20px" },
+  depositLabel: { color: "var(--text-tertiary)", fontSize: "13px" },
+  depositValue: { color: "var(--accent-gold)", fontSize: "24px", fontFamily: "'Playfair Display', serif" },
   button: layout.button,
   message: layout.message,
   emptyState: layout.emptyState,
   emptyText: layout.emptyText,
   bookingsList: { display: "flex", flexDirection: "column", gap: "12px" },
-  bookingCard: { display: "flex", gap: "24px", background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "20px 24px" },
-  bookingDateBox: { display: "flex", flexDirection: "column", alignItems: "center", background: "rgba(201,151,74,0.05)", border: "1px solid rgba(201,151,74,0.1)", borderRadius: "10px", padding: "12px 16px", minWidth: "56px" },
-  bookingDay: { color: "#c9974a", fontSize: "22px", fontWeight: "600", fontFamily: "'Playfair Display', serif" },
-  bookingMonth: { color: "#555", fontSize: "11px", textTransform: "uppercase", letterSpacing: "1px" },
+  bookingCard: { display: "flex", gap: "24px", background: "var(--bg-secondary)", border: "1px solid var(--border-primary)", borderRadius: "12px", padding: "20px 24px" },
+  bookingDateBox: { display: "flex", flexDirection: "column", alignItems: "center", background: "var(--warning-bg-subtle)", border: "1px solid var(--warning-border-subtle)", borderRadius: "10px", padding: "12px 16px", minWidth: "56px" },
+  bookingDay: { color: "var(--accent-gold)", fontSize: "22px", fontWeight: "600", fontFamily: "'Playfair Display', serif" },
+  bookingMonth: { color: "var(--text-muted)", fontSize: "11px", textTransform: "uppercase", letterSpacing: "1px" },
   bookingInfo: { flex: 1 },
-  bookingName: { color: "#f5f5f5", fontSize: "16px", margin: "0 0 4px 0", fontWeight: "500" },
-  bookingMeta: { color: "#6b6b6b", fontSize: "13px", margin: 0 },
+  bookingName: { color: "var(--text-primary)", fontSize: "16px", margin: "0 0 4px 0", fontWeight: "500" },
+  bookingMeta: { color: "var(--text-tertiary)", fontSize: "13px", margin: 0 },
   bookingRight: {},
   statusWrap: { position: "relative", marginBottom: "8px" },
   statusBadge: { display: "inline-flex", alignItems: "center", gap: "5px", padding: "3px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
-  statusMenu: { position: "absolute", top: "calc(100% + 6px)", right: 0, background: "#141416", border: "1px solid #1e1e1e", borderRadius: "8px", padding: "4px", zIndex: 10, minWidth: "130px", boxShadow: "0 8px 24px rgba(0,0,0,0.4)" },
+  statusMenu: { position: "absolute", top: "calc(100% + 6px)", right: 0, background: "var(--bg-tertiary)", border: "1px solid var(--border-secondary)", borderRadius: "8px", padding: "4px", zIndex: 10, minWidth: "130px", boxShadow: "var(--shadow-dropdown)" },
   statusOption: { display: "flex", alignItems: "center", gap: "6px", padding: "8px 10px", borderRadius: "6px", fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.5px", cursor: "pointer" },
-  bookingPrice: { color: "#f5f5f5", fontSize: "18px", fontWeight: "600", margin: "0 0 2px 0", fontFamily: "'Playfair Display', serif" },
-  bookingDeposit: { color: "#6b6b6b", fontSize: "12px", margin: 0 },
+  bookingPrice: { color: "var(--text-primary)", fontSize: "18px", fontWeight: "600", margin: "0 0 2px 0", fontFamily: "'Playfair Display', serif" },
+  bookingDeposit: { color: "var(--text-tertiary)", fontSize: "12px", margin: 0 },
   rowActions: layout.rowActions,
   iconBtn: layout.iconBtn,
 }

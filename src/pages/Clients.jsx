@@ -2,7 +2,9 @@ import { useState, useEffect } from "react"
 import { supabase } from "../supabase"
 import { Users, User, Mail, Phone, Plus, ArrowLeft, Pencil, Trash2 } from "lucide-react"
 import ClientDetail from "../components/ClientDetail"
+import ListError from "../components/ListError"
 import * as layout from "../styles/layout"
+import ConfirmDialog from "../components/ConfirmDialog"
 
 const emptyForm = { name: "", email: "", phone: "", notes: "" }
 
@@ -11,9 +13,11 @@ export default function Clients({ startInForm }) {
   const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(false)
   const [listLoading, setListLoading] = useState(true)
+  const [listError, setListError] = useState(null)
   const [message, setMessage] = useState("")
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm)
+  const [clientToDelete, setClientToDelete] = useState(null)
   const [selectedClient, setSelectedClient] = useState(null)
   const [cameFromDetail, setCameFromDetail] = useState(false)
 
@@ -21,12 +25,19 @@ export default function Clients({ startInForm }) {
 
   const fetchClients = async () => {
     setListLoading(true)
+    setListError(null)
     const { data: { user } } = await supabase.auth.getUser()
     const { data, error } = await supabase
       .from("clients")
       .select("*")
       .eq("artist_id", user.id)
-    if (!error) setClients(data)
+       .order("created_at", { ascending: false })
+    if (error) {
+      console.error("Clients fetch error:", error)
+      setListError(error.message)
+    } else {
+      setClients(data)
+    }
     setListLoading(false)
   }
 
@@ -70,27 +81,32 @@ export default function Clients({ startInForm }) {
     setView("form")
   }
 
-  const handleDelete = async (client) => {
-    if (!window.confirm(`Delete client ${client.name}? This cannot be undone.`)) return
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data, error } = await supabase
-      .from("clients")
-      .delete()
-      .eq("id", client.id)
-      .eq("artist_id", user.id)
-      .select()
-    if (error) {
-      console.error("Client delete error:", error)
-      setMessage("Delete error: " + error.message)
-      return
-    }
-    if (!data || data.length === 0) {
-      console.error("Client delete affected 0 rows", { id: client.id, artist_id: user.id })
-      setMessage("Delete failed — no matching row (check DELETE RLS policy).")
-      return
-    }
-    setClients((prev) => prev.filter((c) => c.id !== client.id))
+  const confirmDelete = (client) => {
+  setClientToDelete(client)
+}
+
+const handleDelete = async () => {
+  const client = clientToDelete
+  setClientToDelete(null)
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data, error } = await supabase
+    .from("clients")
+    .delete()
+    .eq("id", client.id)
+    .eq("artist_id", user.id)
+    .select()
+  if (error) {
+    console.error("Client delete error:", error)
+    setMessage("Delete error: " + error.message)
+    return
   }
+  if (!data || data.length === 0) {
+    console.error("Client delete affected 0 rows", { id: client.id, artist_id: user.id })
+    setMessage("Delete failed — no matching row (check DELETE RLS policy).")
+    return
+  }
+  setClients((prev) => prev.filter((c) => c.id !== client.id))
+}
 
   const handleSubmit = async () => {
     if (!form.name || !form.email) {
@@ -194,14 +210,14 @@ export default function Clients({ startInForm }) {
             <div style={styles.field}>
               <label style={styles.label}>Full Name *</label>
               <div style={styles.inputWrapper}>
-                <User size={15} color="#6b6b6b" style={styles.inputIcon} />
+                <User size={15} color="var(--text-tertiary)" style={styles.inputIcon} />
                 <input style={styles.input} name="name" placeholder="e.g. Sarah Johnson" value={form.name} onChange={handleChange} />
               </div>
             </div>
             <div style={styles.field}>
               <label style={styles.label}>Email *</label>
               <div style={styles.inputWrapper}>
-                <Mail size={15} color="#6b6b6b" style={styles.inputIcon} />
+                <Mail size={15} color="var(--text-tertiary)" style={styles.inputIcon} />
                 <input style={styles.input} name="email" placeholder="e.g. sarah@email.com" value={form.email} onChange={handleChange} />
               </div>
             </div>
@@ -209,7 +225,7 @@ export default function Clients({ startInForm }) {
           <div style={styles.field}>
             <label style={styles.label}>Phone</label>
             <div style={styles.inputWrapper}>
-              <Phone size={15} color="#6b6b6b" style={styles.inputIcon} />
+              <Phone size={15} color="var(--text-tertiary)" style={styles.inputIcon} />
               <input style={styles.input} name="phone" placeholder="e.g. +1 234 567 8900" value={form.phone} onChange={handleChange} />
             </div>
           </div>
@@ -235,12 +251,14 @@ export default function Clients({ startInForm }) {
           {message && <p style={{ ...styles.message, textAlign: "left", marginBottom: "16px" }}>{message}</p>}
           {listLoading ? (
             <div style={styles.emptyState}>
-              <Users size={36} color="#5c5c5c" />
+              <Users size={36} color="var(--text-muted)" />
               <p style={styles.emptyText}>Loading clients…</p>
             </div>
+          ) : listError ? (
+            <ListError message={"Couldn't load clients — " + listError} onRetry={fetchClients} />
           ) : clients.length === 0 ? (
             <div style={styles.emptyState}>
-              <Users size={36} color="#222" />
+              <Users size={36} color="var(--text-tertiary)" />
               <p style={styles.emptyText}>No clients yet. Add your first one!</p>
             </div>
           ) : (
@@ -259,11 +277,11 @@ export default function Clients({ startInForm }) {
                     <h3 style={styles.clientName}>{client.name}</h3>
                     <div style={styles.clientMeta}>
                       <span style={styles.clientMetaItem}>
-                        <Mail size={12} color="#6b6b6b" /> {client.email}
+                        <Mail size={12} color="var(--text-tertiary)" /> {client.email}
                       </span>
                       {client.phone && (
                         <span style={styles.clientMetaItem}>
-                          <Phone size={12} color="#6b6b6b" /> {client.phone}
+                          <Phone size={12} color="var(--text-tertiary)" /> {client.phone}
                         </span>
                       )}
                     </div>
@@ -288,16 +306,16 @@ export default function Clients({ startInForm }) {
                       aria-label={`Edit client ${client.name}`}
                       onClick={(e) => { e.stopPropagation(); openEdit(client) }}
                     >
-                      <Pencil size={14} color="#8a8a8a" />
+                      <Pencil size={14} color="var(--text-secondary)" />
                     </button>
                     <button
                       type="button"
                       style={styles.iconBtn}
                       className="vlt-icon-btn"
                       aria-label={`Delete client ${client.name}`}
-                      onClick={(e) => { e.stopPropagation(); handleDelete(client) }}
+                      onClick={(e) => { e.stopPropagation(); confirmDelete(client) }}
                     >
-                      <Trash2 size={14} color="#8b1a1a" />
+                      <Trash2 size={14} color="var(--danger-primary)" />
                     </button>
                   </div>
                 </div>
@@ -305,11 +323,20 @@ export default function Clients({ startInForm }) {
             </div>
           )}
         </div>
-      )}
+              )}
+
+      <ConfirmDialog
+        open={!!clientToDelete}
+        title={clientToDelete ? `Delete client ${clientToDelete.name}?` : ""}
+        message="This cannot be undone."
+        danger
+        onConfirm={handleDelete}
+        onCancel={() => setClientToDelete(null)}
+      />
     </div>
   )
 }
-
+    
 const styles = {
   container: layout.container,
   header: layout.header,
@@ -323,22 +350,22 @@ const styles = {
   label: layout.label,
   inputWrapper: layout.inputWrapper,
   inputIcon: layout.inputIcon,
-  input: { ...layout.input, background: "#0f0f10" },
+  input: { ...layout.input, background: "var(--bg-secondary)" },
   button: layout.button,
   message: layout.message,
   emptyState: layout.emptyState,
   emptyText: layout.emptyText,
   clientsList: { display: "flex", flexDirection: "column", gap: "12px" },
-  clientCard: { display: "flex", gap: "20px", background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "20px 24px" },
-  clientAvatar: { width: "48px", height: "48px", borderRadius: "50%", background: "linear-gradient(135deg, #c9974a, #a07830)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", fontWeight: "600", color: "#0a0a0a", flexShrink: 0, fontFamily: "'Playfair Display', serif" },
+  clientCard: { display: "flex", gap: "20px", background: "var(--bg-secondary)", border: "1px solid var(--border-primary)", borderRadius: "12px", padding: "20px 24px" },
+  clientAvatar: { width: "48px", height: "48px", borderRadius: "50%", background: "linear-gradient(135deg, var(--accent-gold), var(--accent-gold-dark))", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", fontWeight: "600", color: "var(--text-on-accent)", flexShrink: 0, fontFamily: "'Playfair Display', serif" },
   clientInfo: { flex: 1 },
-  clientName: { color: "#f5f5f5", fontSize: "16px", margin: "0 0 8px 0", fontWeight: "500" },
+  clientName: { color: "var(--text-primary)", fontSize: "16px", margin: "0 0 8px 0", fontWeight: "500" },
   clientMeta: { display: "flex", gap: "16px", flexWrap: "wrap" },
-  clientMetaItem: { display: "flex", alignItems: "center", gap: "6px", color: "#6b6b6b", fontSize: "13px" },
-  clientNotes: { color: "#5c5c5c", fontSize: "12px", margin: "8px 0 0 0", fontStyle: "italic" },
+  clientMetaItem: { display: "flex", alignItems: "center", gap: "6px", color: "var(--text-tertiary)", fontSize: "13px" },
+  clientNotes: { color: "var(--text-muted)", fontSize: "12px", margin: "8px 0 0 0", fontStyle: "italic" },
   clientDate: {},
-  clientDateLabel: { color: "#5c5c5c", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", margin: "0 0 4px 0" },
-  clientDateValue: { color: "#c9974a", fontSize: "14px", fontWeight: "600", margin: 0, fontFamily: "'Playfair Display', serif" },
+  clientDateLabel: { color: "var(--text-muted)", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", margin: "0 0 4px 0" },
+  clientDateValue: { color: "var(--accent-gold)", fontSize: "14px", fontWeight: "600", margin: 0, fontFamily: "'Playfair Display', serif" },
   rowActions: layout.rowActions,
   iconBtn: layout.iconBtn,
 }

@@ -18,7 +18,7 @@ function CheckBox({ name, label, required, checked, onChange }) {
     <label style={styles.checkboxLabel}>
       <input type="checkbox" name={name} checked={checked} onChange={onChange} style={styles.checkbox} />
       <span style={styles.checkboxText}>
-        {label} {required && <span style={{ color: "#8b1a1a" }}>*</span>}
+        {label} {required && <span style={{ color: "var(--danger-primary)" }}>*</span>}
       </span>
     </label>
   )
@@ -117,7 +117,7 @@ export default function SignConsentForm() {
     const { x, y } = getCanvasPoint(e)
     const ctx = canvasRef.current.getContext("2d")
     ctx.lineTo(x, y)
-    ctx.strokeStyle = "#f5f5f5"
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--text-primary").trim() || "#f5f5f5"
     ctx.lineWidth = 2
     ctx.lineCap = "round"
     ctx.lineJoin = "round"
@@ -195,7 +195,7 @@ export default function SignConsentForm() {
 
       {status === "done" && (
         <div style={styles.card} className="vlt-sign-card">
-          <CheckCircle size={40} color="#2d6a4f" />
+          <CheckCircle size={40} color="var(--success-primary)" />
           <h2 style={{ ...styles.title, marginTop: "16px" }}>Signed successfully</h2>
           <p style={styles.sub}>Thank you — your consent form has been submitted to your artist.</p>
         </div>
@@ -208,9 +208,9 @@ export default function SignConsentForm() {
 
           <div style={styles.section}>
             <h3 style={styles.sectionTitle}>Client Details</h3>
-            <div style={styles.readRow}><User size={14} color="#6b6b6b" /> {formData.client_name}</div>
-            <div style={styles.readRow}><Mail size={14} color="#6b6b6b" /> {formData.client_email}</div>
-            <div style={styles.readRow}><CalendarDays size={14} color="#6b6b6b" /> {parseLocalDate(formData.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
+            <div style={styles.readRow}><User size={14} color="var(--text-tertiary)" /> {formData.client_name}</div>
+            <div style={styles.readRow}><Mail size={14} color="var(--text-tertiary)" /> {formData.client_email}</div>
+            <div style={styles.readRow}><CalendarDays size={14} color="var(--text-tertiary)" /> {parseLocalDate(formData.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
           </div>
 
           <div style={styles.section}>
@@ -277,32 +277,32 @@ export default function SignConsentForm() {
 
 const styles = {
   page: {
-    background: "#0a0a0a", fontFamily: "'DM Sans', sans-serif",
+    background: "var(--bg-primary)", fontFamily: "'DM Sans', sans-serif",
     display: "flex", flexDirection: "column", alignItems: "center",
   },
   brandRow: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "32px" },
-  logo: { width: "32px", height: "32px", objectFit: "cover", borderRadius: "50%", border: "1px solid #1e1e1e" },
-  brandName: { fontFamily: "'Playfair Display', serif", color: "#f5f5f5", fontSize: "20px", letterSpacing: "1px" },
+  logo: { width: "32px", height: "32px", objectFit: "cover", borderRadius: "50%", border: "1px solid var(--border-secondary)" },
+  brandName: { fontFamily: "'Playfair Display', serif", color: "var(--text-primary)", fontSize: "20px", letterSpacing: "1px" },
   card: {
-    width: "100%", maxWidth: "640px", background: "#0d0d0d", border: "1px solid #1a1a1a",
+    width: "100%", maxWidth: "640px", background: "var(--bg-card-alt)", border: "1px solid var(--border-primary)",
     borderRadius: "16px", display: "flex", flexDirection: "column", gap: "24px",
     boxSizing: "border-box",
   },
-  loadingText: { color: "#6b6b6b", fontSize: "14px", textAlign: "center", margin: 0 },
-  title: { fontFamily: "'Playfair Display', serif", color: "#f5f5f5", fontSize: "26px", margin: 0, fontWeight: "600" },
-  sub: { color: "#6b6b6b", fontSize: "14px", margin: "-16px 0 0 0", lineHeight: "1.6" },
-  section: { background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "20px", display: "flex", flexDirection: "column", gap: "12px" },
-  sectionTitle: { fontFamily: "'Playfair Display', serif", color: "#f5f5f5", fontSize: "16px", margin: 0, fontWeight: "400" },
-  sectionSub: { color: "#6b6b6b", fontSize: "12px", margin: 0 },
-  readRow: { display: "flex", alignItems: "center", gap: "8px", color: "#ccc", fontSize: "14px", overflowWrap: "anywhere" },
+  loadingText: { color: "var(--text-tertiary)", fontSize: "14px", textAlign: "center", margin: 0 },
+  title: { fontFamily: "'Playfair Display', serif", color: "var(--text-primary)", fontSize: "26px", margin: 0, fontWeight: "600" },
+  sub: { color: "var(--text-tertiary)", fontSize: "14px", margin: "-16px 0 0 0", lineHeight: "1.6" },
+  section: { background: "var(--bg-secondary)", border: "1px solid var(--border-primary)", borderRadius: "12px", padding: "20px", display: "flex", flexDirection: "column", gap: "12px" },
+  sectionTitle: { fontFamily: "'Playfair Display', serif", color: "var(--text-primary)", fontSize: "16px", margin: 0, fontWeight: "400" },
+  sectionSub: { color: "var(--text-tertiary)", fontSize: "12px", margin: 0 },
+  readRow: { display: "flex", alignItems: "center", gap: "8px", color: "var(--text-secondary)", fontSize: "14px", overflowWrap: "anywhere" },
   checkboxGrid: { display: "grid", gap: "12px" },
   consentList: { display: "flex", flexDirection: "column", gap: "12px" },
   checkboxLabel: { display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" },
-  checkbox: { width: "16px", height: "16px", cursor: "pointer", accentColor: "#c9974a" },
-  checkboxText: { color: "#888", fontSize: "14px" },
-  input: { width: "100%", padding: "12px 16px", background: "#141416", border: "1px solid #1a1a1a", borderRadius: "8px", color: "#f5f5f5", fontSize: "16px", outline: "none", boxSizing: "border-box", fontFamily: "'DM Sans', sans-serif" },
-  canvas: { width: "100%", height: "160px", background: "#141416", border: "1px solid #1a1a1a", borderRadius: "8px", touchAction: "none", cursor: "crosshair" },
-  clearBtn: { display: "flex", alignItems: "center", gap: "6px", background: "transparent", border: "1px solid #1e1e1e", borderRadius: "6px", padding: "6px 10px", color: "#6b6b6b", fontSize: "12px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
-  button: { padding: "14px", background: "#c9974a", border: "none", borderRadius: "8px", color: "#0a0a0a", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
-  message: { color: "#8b1a1a", fontSize: "13px", textAlign: "center", margin: 0 },
+  checkbox: { width: "16px", height: "16px", cursor: "pointer", accentColor: "var(--accent-gold)" },
+  checkboxText: { color: "var(--text-secondary)", fontSize: "14px" },
+  input: { width: "100%", padding: "12px 16px", background: "var(--bg-tertiary)", border: "1px solid var(--border-primary)", borderRadius: "8px", color: "var(--text-primary)", fontSize: "16px", outline: "none", boxSizing: "border-box", fontFamily: "'DM Sans', sans-serif" },
+  canvas: { width: "100%", height: "160px", background: "var(--bg-tertiary)", border: "1px solid var(--border-primary)", borderRadius: "8px", touchAction: "none", cursor: "crosshair" },
+  clearBtn: { display: "flex", alignItems: "center", gap: "6px", background: "transparent", border: "1px solid var(--border-secondary)", borderRadius: "6px", padding: "6px 10px", color: "var(--text-tertiary)", fontSize: "12px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+  button: { padding: "14px", background: "var(--accent-gold)", border: "none", borderRadius: "8px", color: "var(--text-on-accent)", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+  message: { color: "var(--danger-primary)", fontSize: "13px", textAlign: "center", margin: 0 },
 }

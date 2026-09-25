@@ -2,29 +2,40 @@ import { useState, useEffect } from "react"
 import { supabase } from "../supabase"
 import { CreditCard, DollarSign, Plus, ArrowLeft, TrendingUp, Wallet, Receipt, Pencil, Trash2 } from "lucide-react"
 import ClientPicker from "../components/ClientPicker"
+import ListError from "../components/ListError"
 import * as layout from "../styles/layout"
+import ConfirmDialog from "../components/ConfirmDialog"
 
 const emptyForm = { client_id: null, client_name: "", amount: "", type: "deposit", method: "cash", notes: "" }
 
 export default function Payments({ startInForm }) {
   const [view, setView] = useState(startInForm ? "form" : "list")
   const [payments, setPayments] = useState([])
+  const [paymentToDelete, setPaymentToDelete] = useState(null)
   const [loading, setLoading] = useState(false)
   const [listLoading, setListLoading] = useState(true)
+  const [listError, setListError] = useState(null)
   const [message, setMessage] = useState("")
   const [editingId, setEditingId] = useState(null)
-  const [form, setForm] = useState(emptyForm)
+const [form, setForm] = useState(emptyForm)
 
   useEffect(() => { fetchPayments() }, [])
 
-  const fetchPayments = async () => {
+const fetchPayments = async () => {
     setListLoading(true)
+    setListError(null)
     const { data: { user } } = await supabase.auth.getUser()
     const { data, error } = await supabase
       .from("payments")
       .select("*")
       .eq("artist_id", user.id)
-    if (!error) setPayments(data)
+      .order("paid_at", { ascending: false })
+    if (error) {
+      console.error("Payments fetch error:", error)
+      setListError(error.message)
+    } else {
+      setPayments(data)
+    }
     setListLoading(false)
   }
 
@@ -60,27 +71,32 @@ export default function Payments({ startInForm }) {
     setView("form")
   }
 
-  const handleDelete = async (payment) => {
-    if (!window.confirm(`Delete payment of $${parseFloat(payment.amount || 0).toFixed(2)} from ${payment.client_name}? This cannot be undone.`)) return
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data, error } = await supabase
-      .from("payments")
-      .delete()
-      .eq("id", payment.id)
-      .eq("artist_id", user.id)
-      .select()
-    if (error) {
-      console.error("Payment delete error:", error)
-      setMessage("Delete error: " + error.message)
-      return
-    }
-    if (!data || data.length === 0) {
-      console.error("Payment delete affected 0 rows", { id: payment.id, artist_id: user.id })
-      setMessage("Delete failed — no matching row (check DELETE RLS policy).")
-      return
-    }
-    setPayments((prev) => prev.filter((p) => p.id !== payment.id))
+const confirmDelete = (payment) => {
+  setPaymentToDelete(payment)
+}
+
+const handleDelete = async () => {
+  const payment = paymentToDelete
+  setPaymentToDelete(null)
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data, error } = await supabase
+    .from("payments")
+    .delete()
+    .eq("id", payment.id)
+    .eq("artist_id", user.id)
+    .select()
+  if (error) {
+    console.error("Payment delete error:", error)
+    setMessage("Delete error: " + error.message)
+    return
   }
+  if (!data || data.length === 0) {
+    console.error("Payment delete affected 0 rows", { id: payment.id, artist_id: user.id })
+    setMessage("Delete failed — no matching row (check DELETE RLS policy).")
+    return
+  }
+  setPayments((prev) => prev.filter((p) => p.id !== payment.id))
+}
 
   const handleSubmit = async () => {
     if (!form.client_name || !form.amount) {
@@ -140,17 +156,17 @@ export default function Payments({ startInForm }) {
   const totalFinal = payments.filter(p => p.type === "final").reduce((sum, p) => sum + parseFloat(p.amount || 0), 0)
 
   const getMethodIcon = (method) => {
-    if (method === "cash") return <Wallet size={18} color="#c9974a" />
-    if (method === "card") return <CreditCard size={18} color="#4c9ac9" />
-    if (method === "transfer") return <Receipt size={18} color="#2d6a4f" />
-    return <DollarSign size={18} color="#c9974a" />
+    if (method === "cash") return <Wallet size={18} color="var(--accent-gold)" />
+    if (method === "card") return <CreditCard size={18} color="var(--info-primary)" />
+    if (method === "transfer") return <Receipt size={18} color="var(--success-primary)" />
+    return <DollarSign size={18} color="var(--accent-gold)" />
   }
 
   const getTypeColor = (type) => {
-    if (type === "deposit") return "#c9974a"
-    if (type === "final") return "#2d6a4f"
-    if (type === "tip") return "#4c9ac9"
-    return "#c9974a"
+    if (type === "deposit") return "var(--accent-gold)"
+    if (type === "final") return "var(--success-primary)"
+    if (type === "tip") return "var(--info-primary)"
+    return "var(--accent-gold)"
   }
 
   return (
@@ -177,22 +193,22 @@ export default function Payments({ startInForm }) {
       {view === "list" && (
         <div style={styles.summaryGrid} className="vlt-kpi-grid">
           <div style={styles.summaryCard}>
-            <div style={styles.summaryIcon}><TrendingUp size={18} color="#c9974a" /></div>
+            <div style={styles.summaryIcon}><TrendingUp size={18} color="var(--accent-gold)" /></div>
             <p style={styles.summaryLabel}>Total Revenue</p>
             <p style={styles.summaryValue}>${totalRevenue.toFixed(2)}</p>
           </div>
           <div style={styles.summaryCard}>
-            <div style={styles.summaryIcon}><Wallet size={18} color="#c9974a" /></div>
+            <div style={styles.summaryIcon}><Wallet size={18} color="var(--accent-gold)" /></div>
             <p style={styles.summaryLabel}>Total Deposits</p>
-            <p style={{ ...styles.summaryValue, color: "#c9974a" }}>${totalDeposits.toFixed(2)}</p>
+            <p style={{ ...styles.summaryValue, color: "var(--accent-gold)" }}>${totalDeposits.toFixed(2)}</p>
           </div>
           <div style={styles.summaryCard}>
-            <div style={styles.summaryIcon}><CreditCard size={18} color="#2d6a4f" /></div>
+            <div style={styles.summaryIcon}><CreditCard size={18} color="var(--success-primary)" /></div>
             <p style={styles.summaryLabel}>Final Payments</p>
-            <p style={{ ...styles.summaryValue, color: "#2d6a4f" }}>${totalFinal.toFixed(2)}</p>
+            <p style={{ ...styles.summaryValue, color: "var(--success-primary)" }}>${totalFinal.toFixed(2)}</p>
           </div>
           <div style={styles.summaryCard}>
-            <div style={styles.summaryIcon}><Receipt size={18} color="#888" /></div>
+            <div style={styles.summaryIcon}><Receipt size={18} color="var(--text-secondary)" /></div>
             <p style={styles.summaryLabel}>Transactions</p>
             <p style={styles.summaryValue}>{payments.length}</p>
           </div>
@@ -216,7 +232,7 @@ export default function Payments({ startInForm }) {
           <div style={styles.field}>
             <label style={styles.label}>Amount ($) *</label>
             <div style={styles.inputWrapper}>
-              <DollarSign size={15} color="#6b6b6b" style={styles.inputIcon} />
+              <DollarSign size={15} color="var(--text-tertiary)" style={styles.inputIcon} />
               <input style={styles.input} name="amount" type="number" placeholder="e.g. 150" value={form.amount} onChange={handleChange} />
             </div>
           </div>
@@ -256,12 +272,14 @@ export default function Payments({ startInForm }) {
           {message && <p style={{ ...styles.message, textAlign: "left" }}>{message}</p>}
           {listLoading ? (
             <div style={styles.emptyState}>
-              <CreditCard size={36} color="#5c5c5c" />
+              <CreditCard size={36} color="var(--text-muted)" />
               <p style={styles.emptyText}>Loading payments…</p>
             </div>
+          ) : listError ? (
+            <ListError message={"Couldn't load payments — " + listError} onRetry={fetchPayments} />
           ) : payments.length === 0 ? (
             <div style={styles.emptyState}>
-              <CreditCard size={36} color="#222" />
+              <CreditCard size={36} color="var(--text-tertiary)" />
               <p style={styles.emptyText}>No payments recorded yet.</p>
             </div>
           ) : (
@@ -299,27 +317,35 @@ export default function Payments({ startInForm }) {
                     aria-label={`Edit payment from ${payment.client_name}`}
                     onClick={() => openEdit(payment)}
                   >
-                    <Pencil size={14} color="#8a8a8a" />
+                    <Pencil size={14} color="var(--text-secondary)" />
                   </button>
                   <button
                     type="button"
                     style={styles.iconBtn}
                     className="vlt-icon-btn"
                     aria-label={`Delete payment from ${payment.client_name}`}
-                    onClick={() => handleDelete(payment)}
+                    onClick={() => confirmDelete(payment)}
                   >
-                    <Trash2 size={14} color="#8b1a1a" />
+                    <Trash2 size={14} color="var(--danger-primary)" />
                   </button>
                 </div>
               </div>
             ))
           )}
         </div>
-      )}
+            )}
+
+      <ConfirmDialog
+        open={!!paymentToDelete}
+        title={paymentToDelete ? `Delete payment of $${parseFloat(paymentToDelete.amount || 0).toFixed(2)} from ${paymentToDelete.client_name}?` : ""}
+        message="This cannot be undone."
+        danger
+        onConfirm={handleDelete}
+        onCancel={() => setPaymentToDelete(null)}
+      />
     </div>
   )
 }
-
 const styles = {
   container: layout.container,
   header: layout.header,
@@ -328,29 +354,29 @@ const styles = {
   newBtn: layout.newBtn,
   divider: layout.divider,
   summaryGrid: { display: "grid", gap: "16px", marginBottom: "32px" },
-  summaryCard: { background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "20px 24px" },
+  summaryCard: { background: "var(--bg-secondary)", border: "1px solid var(--border-primary)", borderRadius: "12px", padding: "20px 24px" },
   summaryIcon: { marginBottom: "12px" },
-  summaryLabel: { color: "#6b6b6b", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", margin: "0 0 8px 0" },
-  summaryValue: { color: "#f5f5f5", fontSize: "24px", fontWeight: "600", margin: 0, fontFamily: "'Playfair Display', serif" },
+  summaryLabel: { color: "var(--text-tertiary)", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", margin: "0 0 8px 0" },
+  summaryValue: { color: "var(--text-primary)", fontSize: "24px", fontWeight: "600", margin: 0, fontFamily: "'Playfair Display', serif" },
   form: { display: "flex", flexDirection: "column", gap: "20px", maxWidth: "700px" },
   formGrid: layout.formGrid,
   field: layout.field,
   label: layout.label,
   inputWrapper: layout.inputWrapper,
   inputIcon: layout.inputIcon,
-  input: { ...layout.input, background: "#0f0f10" },
+  input: { ...layout.input, background: "var(--bg-secondary)" },
   button: layout.button,
   message: layout.message,
   paymentsList: { display: "flex", flexDirection: "column", gap: "12px" },
-  paymentCard: { display: "flex", gap: "20px", background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "20px 24px" },
-  paymentIconBox: { width: "44px", height: "44px", borderRadius: "10px", background: "#141416", border: "1px solid #1a1a1a", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  paymentCard: { display: "flex", gap: "20px", background: "var(--bg-secondary)", border: "1px solid var(--border-primary)", borderRadius: "12px", padding: "20px 24px" },
+  paymentIconBox: { width: "44px", height: "44px", borderRadius: "10px", background: "var(--bg-tertiary)", border: "1px solid var(--border-primary)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
   paymentInfo: { flex: 1 },
-  paymentName: { color: "#f5f5f5", fontSize: "16px", margin: "0 0 4px 0", fontWeight: "500" },
-  paymentNote: { color: "#6b6b6b", fontSize: "13px", margin: 0 },
+  paymentName: { color: "var(--text-primary)", fontSize: "16px", margin: "0 0 4px 0", fontWeight: "500" },
+  paymentNote: { color: "var(--text-tertiary)", fontSize: "13px", margin: 0 },
   paymentRight: {},
   typeBadge: { display: "inline-block", padding: "3px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" },
-  paymentAmount: { color: "#f5f5f5", fontSize: "20px", fontWeight: "600", margin: "0 0 2px 0", fontFamily: "'Playfair Display', serif" },
-  paymentDate: { color: "#6b6b6b", fontSize: "12px", margin: 0 },
+  paymentAmount: { color: "var(--text-primary)", fontSize: "20px", fontWeight: "600", margin: "0 0 2px 0", fontFamily: "'Playfair Display', serif" },
+  paymentDate: { color: "var(--text-tertiary)", fontSize: "12px", margin: 0 },
   emptyState: layout.emptyState,
   emptyText: layout.emptyText,
   rowActions: layout.rowActions,

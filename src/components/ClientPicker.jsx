@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react"
 import { supabase } from "../supabase"
 import { User, Plus } from "lucide-react"
+import ListError from "./ListError"
 
 /**
  * Searchable client picker with inline "add new" flow.
@@ -18,21 +19,31 @@ export default function ClientPicker({ value, onChange, placeholder = "Search or
   const [query, setQuery] = useState(value?.name ?? "")
   const [open, setOpen] = useState(false)
   const [clients, setClients] = useState([])
+  const [loadError, setLoadError] = useState(null)
   const [highlight, setHighlight] = useState(0)
   const [creating, setCreating] = useState(false)
   const wrapRef = useRef(null)
 
-  // Load clients for this artist once.
-  useEffect(() => {
-    (async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      const { data } = await supabase
-        .from("clients")
-        .select("id, name, email")
-        .eq("artist_id", user.id)
-        .order("name", { ascending: true })
+  // Load clients for this artist once. Error clearing happens in the
+  // retry handler — no synchronous setState here, so the effect that
+  // calls this doesn't trigger cascading renders.
+  const loadClients = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data, error } = await supabase
+      .from("clients")
+      .select("id, name, email")
+      .eq("artist_id", user.id)
+      .order("name", { ascending: true })
+    if (error) {
+      console.error("Client picker fetch error:", error)
+      setLoadError(error.message)
+    } else {
       setClients(data || [])
-    })()
+    }
+  }
+
+  useEffect(() => {
+    loadClients()
   }, [])
 
   // Sync local query when the parent swaps in a different selected value
@@ -103,7 +114,7 @@ export default function ClientPicker({ value, onChange, placeholder = "Search or
   return (
     <div ref={wrapRef} style={styles.wrap}>
       <div style={styles.inputWrapper}>
-        <User size={15} color="#6b6b6b" style={styles.inputIcon} />
+        <User size={15} color="var(--text-tertiary)" style={styles.inputIcon} />
         <input
           style={styles.input}
           placeholder={placeholder}
@@ -121,12 +132,18 @@ export default function ClientPicker({ value, onChange, placeholder = "Search or
         />
       </div>
 
-      {open && (matches.length > 0 || showAdd) && (
+      {open && loadError && (
+        <div style={styles.dropdown}>
+          <ListError message={"Couldn't load clients — " + loadError} onRetry={loadClients} />
+        </div>
+      )}
+
+      {open && !loadError && (matches.length > 0 || showAdd) && (
         <div style={styles.dropdown}>
           {matches.map((c, i) => (
             <div
               key={c.id}
-              style={{ ...styles.option, background: i === highlight ? "#181818" : "transparent" }}
+              style={{ ...styles.option, background: i === highlight ? "var(--neutral-bg)" : "transparent" }}
               onMouseEnter={() => setHighlight(i)}
               onMouseDown={(e) => { e.preventDefault(); selectClient(c) }}
             >
@@ -139,11 +156,11 @@ export default function ClientPicker({ value, onChange, placeholder = "Search or
           ))}
           {showAdd && (
             <div
-              style={{ ...styles.addRow, background: highlight === matches.length ? "#181818" : "transparent" }}
+              style={{ ...styles.addRow, background: highlight === matches.length ? "var(--neutral-bg)" : "transparent" }}
               onMouseEnter={() => setHighlight(matches.length)}
               onMouseDown={(e) => { e.preventDefault(); createAndSelect() }}
             >
-              <Plus size={14} color="#c9974a" />
+              <Plus size={14} color="var(--accent-gold)" />
               <span style={styles.addText}>
                 {creating ? "Adding…" : <>Add <span style={styles.addQuoted}>&ldquo;{query.trim()}&rdquo;</span> as new client</>}
               </span>
@@ -160,16 +177,16 @@ const styles = {
   inputWrapper: { position: "relative" },
   inputIcon: { position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" },
   input: {
-    width: "100%", padding: "12px 16px 12px 40px", background: "#0f0f10",
-    border: "1px solid #1a1a1a", borderRadius: "8px", color: "#f5f5f5",
+    width: "100%", padding: "12px 16px 12px 40px", background: "var(--bg-secondary)",
+    border: "1px solid var(--border-primary)", borderRadius: "8px", color: "var(--text-primary)",
     fontSize: "16px", outline: "none", boxSizing: "border-box",
     fontFamily: "'DM Sans', sans-serif",
   },
   dropdown: {
     position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
-    background: "#0f0f10", border: "1px solid #1e1e1e", borderRadius: "8px",
+    background: "var(--bg-secondary)", border: "1px solid var(--border-secondary)", borderRadius: "8px",
     padding: "4px", zIndex: 20, maxHeight: "320px", overflowY: "auto",
-    boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+    boxShadow: "var(--shadow-dropdown)",
   },
   option: {
     display: "flex", alignItems: "center", gap: "12px",
@@ -177,19 +194,19 @@ const styles = {
   },
   avatar: {
     width: "28px", height: "28px", borderRadius: "50%",
-    background: "linear-gradient(135deg, #c9974a, #a07830)",
+    background: "var(--gradient-gold)",
     display: "flex", alignItems: "center", justifyContent: "center",
-    fontSize: "12px", fontWeight: "600", color: "#0a0a0a", flexShrink: 0,
+    fontSize: "12px", fontWeight: "600", color: "var(--text-on-accent)", flexShrink: 0,
     fontFamily: "'Playfair Display', serif",
   },
   optionText: { display: "flex", flexDirection: "column", gap: "2px", minWidth: 0 },
-  optionName: { color: "#f5f5f5", fontSize: "14px" },
-  optionSub: { color: "#6b6b6b", fontSize: "12px" },
+  optionName: { color: "var(--text-primary)", fontSize: "14px" },
+  optionSub: { color: "var(--text-tertiary)", fontSize: "12px" },
   addRow: {
     display: "flex", alignItems: "center", gap: "10px",
     padding: "10px 12px", borderRadius: "6px", cursor: "pointer",
-    borderTop: "1px solid #1a1a1a", marginTop: "2px",
+    borderTop: "1px solid var(--border-primary)", marginTop: "2px",
   },
-  addText: { color: "#c9974a", fontSize: "13px" },
-  addQuoted: { color: "#f5f5f5" },
+  addText: { color: "var(--accent-gold)", fontSize: "13px" },
+  addQuoted: { color: "var(--text-primary)" },
 }

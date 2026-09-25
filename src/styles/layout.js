@@ -11,8 +11,8 @@
 
 export const container = {
   fontFamily: "'DM Sans', sans-serif",
-  color: "#f5f5f5",
-  background: "#0a0a0a",
+  color: "var(--text-primary)",
+  background: "var(--bg-primary)",
 }
 
 export const header = {
@@ -23,7 +23,7 @@ export const header = {
 }
 
 export const headerSub = {
-  color: "#6b6b6b",
+  color: "var(--text-tertiary)",
   fontSize: "12px",
   textTransform: "uppercase",
   letterSpacing: "1px",
@@ -39,7 +39,7 @@ export const headerTitle = {
 
 export const divider = {
   height: "1px",
-  background: "#1a1a1a",
+  background: "var(--border-primary)",
   marginBottom: "40px",
 }
 
@@ -58,7 +58,7 @@ export const field = {
 
 export const label = {
   fontSize: "12px",
-  color: "#555",
+  color: "var(--text-muted)",
   textTransform: "uppercase",
   letterSpacing: "0.5px",
 }
@@ -81,9 +81,9 @@ export const inputIcon = {
 export const input = {
   width: "100%",
   padding: "12px 16px 12px 40px",
-  border: "1px solid #1a1a1a",
+  border: "1px solid var(--border-primary)",
   borderRadius: "8px",
-  color: "#f5f5f5",
+  color: "var(--text-primary)",
   fontSize: "16px",
   outline: "none",
   boxSizing: "border-box",
@@ -92,10 +92,10 @@ export const input = {
 
 export const button = {
   padding: "13px",
-  background: "#c9974a",
+  background: "var(--accent-gold)",
   border: "none",
   borderRadius: "8px",
-  color: "#0a0a0a",
+  color: "var(--text-on-accent)",
   fontSize: "14px",
   fontWeight: "600",
   cursor: "pointer",
@@ -107,10 +107,10 @@ export const newBtn = {
   alignItems: "center",
   gap: "8px",
   padding: "10px 20px",
-  background: "#c9974a",
+  background: "var(--accent-gold)",
   border: "none",
   borderRadius: "8px",
-  color: "#0a0a0a",
+  color: "var(--text-on-accent)",
   fontSize: "14px",
   fontWeight: "600",
   cursor: "pointer",
@@ -118,15 +118,15 @@ export const newBtn = {
 }
 
 export const message = {
-  color: "#c9974a",
+  color: "var(--accent-gold)",
   fontSize: "13px",
   textAlign: "center",
   margin: 0,
 }
 
 export const emptyState = {
-  background: "#0f0f10",
-  border: "1px solid #1a1a1a",
+  background: "var(--bg-secondary)",
+  border: "1px solid var(--border-primary)",
   borderRadius: "12px",
   padding: "60px",
   textAlign: "center",
@@ -137,7 +137,7 @@ export const emptyState = {
 }
 
 export const emptyText = {
-  color: "#5c5c5c",
+  color: "var(--text-disabled)",
   fontSize: "14px",
   margin: 0,
 }

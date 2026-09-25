@@ -1,12 +1,16 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { getTheme, setTheme } from "../utils/themeHelpers"
 import { supabase } from "../supabase"
-import { User, Mail, Building, Save, Moon, Sun } from "lucide-react"
+import ListError from "../components/ListError"
+import { User, Mail, Building, Save, Moon, Sun, LogOut } from "lucide-react"
 import * as layout from "../styles/layout"
+import ConfirmDialog from "../components/ConfirmDialog"
 
 export default function Settings() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState("")
+  const [profileError, setProfileError] = useState(null)
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
   const [form, setForm] = useState({
     studio_name: "",
     full_name: "",
@@ -22,33 +26,48 @@ function toggleTheme() {
   setTheme(newTheme)
   setThemeState(newTheme)
 }
-useEffect(() => {
-    let isMounted = true
 
-    const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!isMounted) return
-      setForm((prev) => ({ ...prev, email: user.email }))
+async function handleSignOut() {
+  window.__vaultedIntentionalSignOut = true
+  await supabase.auth.signOut()
+}
 
-      const { data } = await supabase
-        .from("artist_profiles")
-        .select("*")
-        .eq("artist_id", user.id)
-        .single()
+  const isMountedRef = useRef(true)
 
-      if (data && isMounted) {
-        setForm((prev) => ({
-          ...prev,
-          studio_name: data.studio_name || "",
-          full_name: data.full_name || "",
-          phone: data.phone || "",
-          bio: data.bio || "",
-        }))
-      }
+  const fetchProfile = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!isMountedRef.current) return
+    setProfileError(null)
+    setForm((prev) => ({ ...prev, email: user.email }))
+
+    const { data, error } = await supabase
+      .from("artist_profiles")
+      .select("*")
+      .eq("artist_id", user.id)
+      .single()
+
+    // A missing row (PGRST116) is normal for a new account — no profile
+    // yet. Any other failure would leave the form silently blank.
+    if (error && error.code !== "PGRST116" && isMountedRef.current) {
+      console.error("Settings profile fetch error:", error)
+      setProfileError("Couldn't load your profile — " + error.message)
     }
 
-    init()
-    return () => { isMounted = false }
+    if (data && isMountedRef.current) {
+      setForm((prev) => ({
+        ...prev,
+        studio_name: data.studio_name || "",
+        full_name: data.full_name || "",
+        phone: data.phone || "",
+        bio: data.bio || "",
+      }))
+    }
+  }
+
+  useEffect(() => {
+    isMountedRef.current = true
+    fetchProfile()
+    return () => { isMountedRef.current = false }
   }, [])
 
   const handleChange = (e) => {
@@ -88,13 +107,14 @@ useEffect(() => {
       <div style={styles.divider} />
 
       <form style={styles.form} onSubmit={(e) => { e.preventDefault(); handleSave() }}>
+        {profileError && <ListError message={profileError} onRetry={fetchProfile} />}
         <div style={styles.section}>
           <h3 style={styles.sectionTitle}>Studio Information</h3>
 
           <div style={styles.field}>
             <label style={styles.label}>Studio Name</label>
             <div style={styles.inputWrapper}>
-              <Building size={15} color="#6b6b6b" style={styles.inputIcon} />
+              <Building size={15} color="var(--text-tertiary)" style={styles.inputIcon} />
               <input style={styles.input} name="studio_name" placeholder="e.g. Vaulted Tattoo Studio" value={form.studio_name} onChange={handleChange} />
             </div>
           </div>
@@ -102,7 +122,7 @@ useEffect(() => {
           <div style={styles.field}>
             <label style={styles.label}>Artist Full Name</label>
             <div style={styles.inputWrapper}>
-              <User size={15} color="#6b6b6b" style={styles.inputIcon} />
+              <User size={15} color="var(--text-tertiary)" style={styles.inputIcon} />
               <input style={styles.input} name="full_name" placeholder="Your full name" value={form.full_name} onChange={handleChange} />
             </div>
           </div>
@@ -110,7 +130,7 @@ useEffect(() => {
           <div style={styles.field}>
             <label style={styles.label}>Email</label>
             <div style={styles.inputWrapper}>
-              <Mail size={15} color="#6b6b6b" style={styles.inputIcon} />
+              <Mail size={15} color="var(--text-tertiary)" style={styles.inputIcon} />
               <input style={{ ...styles.input, opacity: 0.5 }} value={form.email} disabled />
             </div>
           </div>
@@ -149,12 +169,36 @@ useEffect(() => {
           </div>
         </div>
 
+        <div style={styles.section}>
+          <h3 style={styles.sectionTitle}>Account</h3>
+
+          <div style={styles.field}>
+            <label style={styles.label}>Session</label>
+            <button
+              type="button"
+              onClick={() => setShowSignOutConfirm(true)}
+              style={styles.signOutButton}
+            >
+              <LogOut size={16} />
+              Sign Out
+            </button>
+          </div>
+        </div>
+
         <button type="submit" style={styles.button} disabled={loading}>
           <Save size={16} /> {loading ? "Saving..." : "Save Changes"}
         </button>
 
         {message && <p style={styles.message}>{message}</p>}
       </form>
+
+        <ConfirmDialog
+        open={showSignOutConfirm}
+        title="Sign out of Vaulted?"
+        message="Are you sure you want to sign out of your account?"
+        onConfirm={() => { setShowSignOutConfirm(false); handleSignOut() }}
+        onCancel={() => setShowSignOutConfirm(false)}
+      />
     </div>
   )
 }
@@ -166,14 +210,15 @@ const styles = {
   headerTitle: layout.headerTitle,
   divider: layout.divider,
   form: { display: "flex", flexDirection: "column", gap: "24px", maxWidth: "600px" },
-  section: { background: "#0f0f10", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "24px", display: "flex", flexDirection: "column", gap: "16px" },
-  sectionTitle: { fontFamily: "'Playfair Display', serif", color: "#f5f5f5", fontSize: "16px", margin: 0, fontWeight: "400" },
+  section: { background: "var(--bg-secondary)", border: "1px solid var(--border-primary)", borderRadius: "12px", padding: "24px", display: "flex", flexDirection: "column", gap: "16px" },
+  sectionTitle: { fontFamily: "'Playfair Display', serif", color: "var(--text-primary)", fontSize: "16px", margin: 0, fontWeight: "400" },
   field: layout.field,
   label: layout.label,
   inputWrapper: layout.inputWrapper,
   inputIcon: layout.inputIcon,
-  input: { ...layout.input, background: "#141416" },
-  themeToggle: { display: "flex", alignItems: "center", gap: "8px", padding: "11px 16px", background: "#141416", border: "1px solid #2a2a2a", borderRadius: "8px", color: "#f5f5f5", fontSize: "14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", width: "fit-content" },
-  button: { display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", padding: "13px", background: "#c9974a", border: "none", borderRadius: "8px", color: "#0a0a0a", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+  input: { ...layout.input, background: "var(--bg-tertiary)" },
+  themeToggle: { display: "flex", alignItems: "center", gap: "8px", padding: "11px 16px", background: "var(--bg-tertiary)", border: "1px solid var(--border-tertiary)", borderRadius: "8px", color: "var(--text-primary)", fontSize: "14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", width: "fit-content" },
+  signOutButton: { display: "flex", alignItems: "center", gap: "8px", padding: "11px 16px", background: "var(--danger-bg)", border: "1px solid var(--danger-border)", borderRadius: "8px", color: "var(--danger-secondary)", fontSize: "14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", width: "fit-content" },
+  button: { display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", padding: "13px", background: "var(--accent-gold)", border: "none", borderRadius: "8px", color: "var(--text-on-accent)", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
   message: layout.message,
 }

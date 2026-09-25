@@ -7,6 +7,7 @@ import ConsentForms from "./ConsentForms"
 import Payments from "./Payments"
 import Settings from "./Settings"
 import Portfolio from "./Portfolio"
+import ListError from "../components/ListError"
 
 import {
   LayoutDashboard, CalendarDays, Users, FileText,
@@ -15,10 +16,12 @@ import {
 
 export default function Dashboard() {
   const [user, setUser] = useState(null)
+  const [artistName, setArtistName] = useState("")
   const [activePage, setActivePage] = useState("dashboard")
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [startInForm, setStartInForm] = useState(false)
   const [statsLoading, setStatsLoading] = useState(true)
+  const [statsError, setStatsError] = useState(null)
   const [stats, setStats] = useState({
     totalClients: 0,
     bookingsThisWeek: 0,
@@ -26,24 +29,35 @@ export default function Dashboard() {
     consentForms: 0,
   })
 
-    const fetchStats = async (artistId) => {
+const fetchStats = async (artistId) => {
     setStatsLoading(true)
-    const { count: clientCount } = await supabase
+    setStatsError(null)
+
+    const toLocalDateString = (d) => {
+      const year = d.getFullYear()
+      const month = String(d.getMonth() + 1).padStart(2, "0")
+      const day = String(d.getDate()).padStart(2, "0")
+      return `${year}-${month}-${day}`
+    }
+
+    const { count: clientCount, error: clientsError } = await supabase
       .from("clients")
       .select("*", { count: "exact", head: true })
       .eq("artist_id", artistId)
 
     const weekStart = new Date()
+    weekStart.setHours(0, 0, 0, 0)
     weekStart.setDate(weekStart.getDate() - weekStart.getDay())
-    const { count: bookingCount } = await supabase
+    const { count: bookingCount, error: bookingsError } = await supabase
       .from("bookings")
       .select("*", { count: "exact", head: true })
       .eq("artist_id", artistId)
-      .gte("date", weekStart.toISOString().split("T")[0])
+      .gte("date", toLocalDateString(weekStart))
 
     const monthStart = new Date()
+    monthStart.setHours(0, 0, 0, 0)
     monthStart.setDate(1)
-    const { data: payments } = await supabase
+    const { data: payments, error: paymentsError } = await supabase
       .from("payments")
       .select("amount")
       .eq("artist_id", artistId)
@@ -51,11 +65,21 @@ export default function Dashboard() {
 
     const revenue = payments?.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0) || 0
 
-    const { count: consentCount } = await supabase
+    const { count: consentCount, error: consentError } = await supabase
       .from("consent_forms")
       .select("*", { count: "exact", head: true })
       .eq("artist_id", artistId)
       .gte("signed_at", monthStart.toISOString())
+
+    // Any stat query failing means the KPIs would silently read as 0 —
+    // surface that instead of showing misleading zeros.
+    const statsError = clientsError?.message || bookingsError?.message || paymentsError?.message || consentError?.message
+    if (statsError) {
+      console.error("Dashboard stats fetch error:", statsError)
+      setStatsError(statsError)
+      setStatsLoading(false)
+      return
+    }
 
     setStats({
       totalClients: clientCount || 0,
@@ -67,8 +91,16 @@ export default function Dashboard() {
   }
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(async ({ data }) => {
       setUser(data.user)
+      if (data.user) {
+        const { data: profile } = await supabase
+          .from("artist_profiles")
+          .select("full_name")
+          .eq("artist_id", data.user.id)
+          .single()
+        setArtistName(profile?.full_name || "")
+      }
     })
   }, [])
 
@@ -77,8 +109,7 @@ export default function Dashboard() {
       fetchStats(user.id)
     }
   }, [activePage, user?.id])
-
-
+  
   const navItems = [
     { icon: <LayoutDashboard size={18} />, label: "Dashboard" },
     { icon: <CalendarDays size={18} />, label: "Bookings" },
@@ -90,17 +121,17 @@ export default function Dashboard() {
   ]
 
   const statCards = [
-    { label: "Total Clients", value: stats.totalClients, icon: <Users size={20} />, color: "#c9974a" },
-    { label: "Bookings This Week", value: stats.bookingsThisWeek, icon: <CalendarDays size={20} />, color: "#c9974a" },
-    { label: "Revenue This Month", value: `$${stats.revenueThisMonth.toFixed(2)}`, icon: <TrendingUp size={20} />, color: "#2d6a4f" },
-    { label: "Forms Signed This Month", value: stats.consentForms, icon: <FileText size={20} />, color: "#8b1a1a" },
+    { label: "Total Clients", value: stats.totalClients, icon: <Users size={20} />, color: "var(--accent-gold)" },
+    { label: "Bookings This Week", value: stats.bookingsThisWeek, icon: <CalendarDays size={20} />, color: "var(--accent-gold)" },
+    { label: "Revenue This Month", value: `$${stats.revenueThisMonth.toFixed(2)}`, icon: <TrendingUp size={20} />, color: "var(--success-primary)" },
+    { label: "Forms Signed This Month", value: stats.consentForms, icon: <FileText size={20} />, color: "var(--danger-primary)" },
   ]
 
   const quickActions = [
-    { label: "New Booking", icon: <CalendarDays size={24} />, color: "#c9974a", page: "bookings" },
-    { label: "Add Client", icon: <Users size={24} />, color: "#4c9ac9", page: "clients" },
-    { label: "Consent Forms", icon: <FileText size={24} />, color: "#8b1a1a", page: "consent forms" },
-    { label: "Payments", icon: <CreditCard size={24} />, color: "#2d6a4f", page: "payments" },
+    { label: "New Booking", icon: <CalendarDays size={24} />, color: "var(--accent-gold)", page: "bookings" },
+    { label: "Add Client", icon: <Users size={24} />, color: "var(--info-primary)", page: "clients" },
+    { label: "Consent Forms", icon: <FileText size={24} />, color: "var(--danger-primary)", page: "consent forms" },
+    { label: "Payments", icon: <CreditCard size={24} />, color: "var(--success-primary)", page: "payments" },
   ]
 
   const closeDrawer = () => setDrawerOpen(false)
@@ -123,7 +154,7 @@ export default function Dashboard() {
         <img
           src={logo}
           alt="Vaulted"
-          style={{ width: "26px", height: "26px", objectFit: "cover", borderRadius: "50%", border: "1px solid #1e1e1e" }}
+          style={{ width: "26px", height: "26px", objectFit: "cover", borderRadius: "50%", border: "1px solid var(--border-secondary)" }}
         />
         <h2 style={styles.mobileTopbarTitle}>Vaulted</h2>
       </div>
@@ -149,7 +180,7 @@ export default function Dashboard() {
     height: "32px",
     objectFit: "cover",
     borderRadius: "50%",
-    border: "1px solid #1e1e1e",
+    border: "1px solid var(--border-secondary)",
   }}
 />
           <h2 style={styles.sidebarTitle}>Vaulted</h2>
@@ -165,9 +196,9 @@ export default function Dashboard() {
                 aria-current={isActive ? "page" : undefined}
                 style={{
                   ...styles.navItem,
-                  background: isActive ? "rgba(201,151,74,0.1)" : "transparent",
-                  borderLeft: isActive ? "2px solid #c9974a" : "2px solid transparent",
-                  color: isActive ? "#c9974a" : "#555",
+                  background: isActive ? "var(--warning-bg)" : "transparent",
+                  borderLeft: isActive ? "2px solid var(--accent-gold)" : "2px solid transparent",
+                  color: isActive ? "var(--accent-gold)" : "var(--text-muted)",
                 }}
                 onClick={() => {
                   setActivePage(item.label.toLowerCase())
@@ -213,7 +244,7 @@ export default function Dashboard() {
             <div style={styles.header} className="vlt-dashboard-header">
               <div>
                 <p style={styles.headerGreeting}>Good day,</p>
-                <h1 style={styles.headerTitle}>{user?.email?.split("@")[0]}</h1>
+                <h1 style={styles.headerTitle}>{artistName || user?.email?.split("@")[0] || "there"}</h1>
               </div>
               <div style={styles.headerDate}>
                 {new Date().toLocaleDateString("en-US", {
@@ -231,6 +262,12 @@ export default function Dashboard() {
                 the original KPIs -> Quick Actions -> Appointments order. */}
             <div className="vlt-dashboard-content">
               <div className="vlt-order-stats">
+                {statsError ? (
+                  <ListError
+                    message={"Couldn't load dashboard stats — " + statsError}
+                    onRetry={() => fetchStats(user.id)}
+                  />
+                ) : (
                 <div style={styles.statsGrid} className="vlt-kpi-grid">
                   {statCards.map((stat) => (
                     <div key={stat.label} style={styles.statCard}>
@@ -244,6 +281,7 @@ export default function Dashboard() {
                     </div>
                   ))}
                 </div>
+                )}
               </div>
 
               <div className="vlt-order-actions">
@@ -301,7 +339,7 @@ function TodayAppointments({ artistId }) {
   if (loading) {
     return (
       <div style={styles.emptyState}>
-        <CalendarDays size={32} color="#5c5c5c" />
+        <CalendarDays size={32} style={{ color: "var(--skeleton-text)" }} />
         <p style={styles.emptyText}>Loading appointments…</p>
       </div>
     )
@@ -310,7 +348,7 @@ function TodayAppointments({ artistId }) {
   if (appointments.length === 0) {
     return (
       <div style={styles.emptyState}>
-        <CalendarDays size={32} color="#5c5c5c" />
+        <CalendarDays size={32} style={{ color: "var(--skeleton-text)" }} />
         <p style={styles.emptyText}>No appointments today. Enjoy the rest!</p>
       </div>
     )
@@ -335,12 +373,12 @@ function TodayAppointments({ artistId }) {
 const styles = {
   container: {
     display: "flex",
-    background: "#0a0a0a",
+    background: "var(--bg-primary)",
     fontFamily: "'DM Sans', sans-serif",
   },
   sidebar: {
-    background: "#0f0f10",
-    borderRight: "1px solid #1a1a1a",
+    background: "var(--bg-secondary)",
+    borderRight: "1px solid var(--border-primary)",
     display: "flex",
     flexDirection: "column",
     padding: "32px 0",
@@ -350,14 +388,14 @@ const styles = {
     zIndex: 40,
   },
   mobileTopbar: {
-    background: "#0f0f10",
-    borderBottom: "1px solid #1a1a1a",
+    background: "var(--bg-secondary)",
+    borderBottom: "1px solid var(--border-primary)",
     gap: "12px",
     padding: "0 16px",
   },
   mobileTopbarTitle: {
     fontFamily: "'Playfair Display', serif",
-    color: "#f5f5f5",
+    color: "var(--text-primary)",
     fontSize: "16px",
     margin: 0,
     letterSpacing: "1px",
@@ -365,7 +403,7 @@ const styles = {
   hamburgerBtn: {
     background: "transparent",
     border: "none",
-    color: "#f5f5f5",
+    color: "var(--text-primary)",
     padding: "10px",
     margin: "0 -6px 0 -10px",
     cursor: "pointer",
@@ -381,12 +419,12 @@ const styles = {
     marginBottom: "48px",
   },
   sidebarLogo: {
-    color: "#c9974a",
+    color: "var(--accent-gold)",
     fontSize: "20px",
   },
   sidebarTitle: {
     fontFamily: "'Playfair Display', serif",
-    color: "#f5f5f5",
+    color: "var(--text-primary)",
     fontSize: "18px",
     margin: 0,
     letterSpacing: "1px",
@@ -418,10 +456,10 @@ const styles = {
     alignItems: "center",
     gap: "10px",
     padding: "12px 24px",
-    color: "#6b6b6b",
+    color: "var(--text-tertiary)",
     cursor: "pointer",
     fontSize: "14px",
-    borderTop: "1px solid #1a1a1a",
+    borderTop: "1px solid var(--border-primary)",
     borderLeft: "none",
     borderRight: "none",
     borderBottom: "none",
@@ -433,11 +471,6 @@ const styles = {
   },
   main: {
     flex: 1,
-    // min-width: 0 overrides the flex-item default of `auto`, which would
-    // otherwise let any long unbreakable content (e.g. a signing URL on the
-    // Consent Forms page) dictate main's minimum width and force page-level
-    // horizontal overflow on phones. With 0, main always caps at the
-    // viewport and inner truncation (ellipsis) can actually engage.
     minWidth: 0,
     padding: "48px 52px",
   },
@@ -448,7 +481,7 @@ const styles = {
     marginBottom: "24px",
   },
   headerGreeting: {
-    color: "#555",
+    color: "var(--text-muted)",
     fontSize: "13px",
     margin: "0 0 4px 0",
     textTransform: "uppercase",
@@ -456,19 +489,19 @@ const styles = {
   },
   headerTitle: {
     fontFamily: "'Playfair Display', serif",
-    color: "#f5f5f5",
+    color: "var(--text-primary)",
     fontSize: "32px",
     margin: 0,
     textTransform: "capitalize",
   },
   headerDate: {
-    color: "#6b6b6b",
+    color: "var(--text-tertiary)",
     fontSize: "13px",
     marginTop: "8px",
   },
   divider: {
     height: "1px",
-    background: "#1a1a1a",
+    background: "var(--border-primary)",
     marginBottom: "40px",
   },
   statsGrid: {
@@ -477,8 +510,8 @@ const styles = {
     marginBottom: "48px",
   },
   statCard: {
-    background: "#0f0f10",
-    border: "1px solid #1a1a1a",
+    background: "var(--bg-secondary)",
+    border: "1px solid var(--border-primary)",
     borderRadius: "12px",
     padding: "24px",
   },
@@ -486,21 +519,21 @@ const styles = {
     marginBottom: "16px",
   },
   statValue: {
-    color: "#f5f5f5",
+    color: "var(--text-primary)",
     fontSize: "28px",
     fontWeight: "600",
     marginBottom: "6px",
     fontFamily: "'Playfair Display', serif",
   },
   statLabel: {
-    color: "#6b6b6b",
+    color: "var(--text-tertiary)",
     fontSize: "12px",
     textTransform: "uppercase",
     letterSpacing: "0.5px",
   },
   sectionTitle: {
     fontFamily: "'Playfair Display', serif",
-    color: "#f5f5f5",
+    color: "var(--text-primary)",
     fontSize: "18px",
     marginBottom: "20px",
     fontWeight: "400",
@@ -511,20 +544,20 @@ const styles = {
     marginBottom: "48px",
   },
   actionCard: {
-    background: "#0f0f10",
-    border: "1px solid #1a1a1a",
+    background: "var(--bg-secondary)",
+    border: "1px solid var(--border-primary)",
     borderRadius: "12px",
     padding: "24px",
     cursor: "pointer",
     transition: "all 0.2s",
   },
   actionLabel: {
-    color: "#888",
+    color: "var(--text-secondary)",
     fontSize: "13px",
   },
   emptyState: {
-    background: "#0f0f10",
-    border: "1px solid #1a1a1a",
+    background: "var(--bg-secondary)",
+    border: "1px solid var(--border-primary)",
     borderRadius: "12px",
     padding: "48px",
     textAlign: "center",
@@ -534,7 +567,7 @@ const styles = {
     gap: "12px",
   },
   emptyText: {
-    color: "#5c5c5c",
+    color: "var(--skeleton-text)",
     fontSize: "14px",
     margin: 0,
   },
@@ -542,31 +575,34 @@ const styles = {
     display: "flex",
     alignItems: "center",
     gap: "16px",
-    background: "#0f0f10",
-    border: "1px solid #1a1a1a",
+    background: "var(--bg-secondary)",
+    border: "1px solid var(--border-primary)",
     borderRadius: "12px",
     padding: "16px 20px",
   },
   aptTime: {
-    color: "#c9974a",
+    color: "var(--accent-gold)",
     fontSize: "13px",
     fontWeight: "600",
     minWidth: "70px",
   },
   aptInfo: { flex: 1 },
   aptName: {
-    color: "#f5f5f5",
+    color: "var(--text-primary)",
     fontSize: "15px",
     margin: "0 0 4px 0",
   },
   aptType: {
-    color: "#6b6b6b",
+    color: "var(--text-tertiary)",
     fontSize: "13px",
     margin: 0,
   },
   aptPrice: {
-    color: "#f5f5f5",
+    color: "var(--text-primary)",
     fontSize: "16px",
     fontWeight: "600",
+  },
+  statValueSkeleton: {
+    color: "var(--skeleton-text)",
   },
 }
