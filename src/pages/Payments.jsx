@@ -3,6 +3,7 @@ import { supabase } from "../supabase"
 import { CreditCard, DollarSign, Plus, ArrowLeft, TrendingUp, Wallet, Receipt, Pencil, Trash2 } from "lucide-react"
 import ClientPicker from "../components/ClientPicker"
 import ListError from "../components/ListError"
+import withTimeout from "../utils/withTimeout"
 import * as layout from "../styles/layout"
 import ConfirmDialog from "../components/ConfirmDialog"
 
@@ -24,12 +25,25 @@ const [form, setForm] = useState(emptyForm)
 const fetchPayments = async () => {
     setListLoading(true)
     setListError(null)
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data, error } = await supabase
-      .from("payments")
-      .select("*")
-      .eq("artist_id", user.id)
-      .order("paid_at", { ascending: false })
+    // getSession reads local storage — no network round-trip, so it can't
+    // hang when offline (getUser() pings /auth/v1/user and would stall
+    // forever ahead of the wrapped query below).
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user
+    if (!user) {
+      setListError("You're not signed in.")
+      setListLoading(false)
+      return
+    }
+    const { data, error } = await withTimeout(
+      supabase
+        .from("payments")
+        .select("*")
+        .eq("artist_id", user.id)
+        .order("paid_at", { ascending: false }),
+      15000,
+      "Loading payments"
+    )
     if (error) {
       console.error("Payments fetch error:", error)
       setListError(error.message)

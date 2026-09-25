@@ -4,6 +4,7 @@ import { Upload, Trash2, Image as ImageIcon } from "lucide-react"
 import * as layout from "../styles/layout"
 import ConfirmDialog from "../components/ConfirmDialog"
 import ListError from "../components/ListError"
+import withTimeout from "../utils/withTimeout"
 
 const CATEGORIES = ["All", "Traditional", "Realism", "Blackwork", "Fine Line", "Japanese", "Other"]
 
@@ -20,7 +21,11 @@ export default function Portfolio() {
   const [file, setFile] = useState(null)
 
   const fetchItems = async (isMounted = { current: true }) => {
-    const { data: { user } } = await supabase.auth.getUser()
+    // getSession reads local storage — no network round-trip, so it can't
+    // hang when offline (getUser() pings /auth/v1/user and would stall
+    // forever ahead of the wrapped query below).
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user
     if (!isMounted.current) return
     setListLoading(true)
     setListError(null)
@@ -28,11 +33,15 @@ export default function Portfolio() {
       setListLoading(false)
       return
     }
-    const { data, error } = await supabase
-      .from("portfolio_items")
-      .select("*")
-      .eq("artist_id", user.id)
-      .order("created_at", { ascending: false })
+    const { data, error } = await withTimeout(
+      supabase
+        .from("portfolio_items")
+        .select("*")
+        .eq("artist_id", user.id)
+        .order("created_at", { ascending: false }),
+      15000,
+      "Loading portfolio"
+    )
 
     if (isMounted.current !== false) {
       if (error) {

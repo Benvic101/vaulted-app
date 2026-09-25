@@ -3,6 +3,7 @@ import { supabase } from "../supabase"
 import { Users, User, Mail, Phone, Plus, ArrowLeft, Pencil, Trash2 } from "lucide-react"
 import ClientDetail from "../components/ClientDetail"
 import ListError from "../components/ListError"
+import withTimeout from "../utils/withTimeout"
 import * as layout from "../styles/layout"
 import ConfirmDialog from "../components/ConfirmDialog"
 
@@ -26,12 +27,25 @@ export default function Clients({ startInForm }) {
   const fetchClients = async () => {
     setListLoading(true)
     setListError(null)
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data, error } = await supabase
-      .from("clients")
-      .select("*")
-      .eq("artist_id", user.id)
-       .order("created_at", { ascending: false })
+    // getSession reads local storage — no network round-trip, so it can't
+    // hang when offline (getUser() pings /auth/v1/user and would stall
+    // forever ahead of the wrapped query below).
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user
+    if (!user) {
+      setListError("You're not signed in.")
+      setListLoading(false)
+      return
+    }
+    const { data, error } = await withTimeout(
+      supabase
+        .from("clients")
+        .select("*")
+        .eq("artist_id", user.id)
+        .order("created_at", { ascending: false }),
+      15000,
+      "Loading clients"
+    )
     if (error) {
       console.error("Clients fetch error:", error)
       setListError(error.message)

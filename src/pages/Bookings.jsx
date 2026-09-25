@@ -3,6 +3,7 @@ import { supabase } from "../supabase"
 import { CalendarDays, Clock, Mail, FileText, Plus, ArrowLeft, DollarSign, Pencil, Trash2, CheckSquare, XCircle, ChevronDown } from "lucide-react"
 import ClientPicker from "../components/ClientPicker"
 import ListError from "../components/ListError"
+import withTimeout from "../utils/withTimeout"
 import * as layout from "../styles/layout"
 import { parseLocalDate } from '../utils/dateHelpers';
 const STATUS_OPTIONS = ["upcoming", "completed", "cancelled"]
@@ -50,12 +51,25 @@ export default function Bookings({ startInForm }) {
   const fetchBookings = async () => {
     setListLoading(true)
     setListError(null)
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data, error } = await supabase
-      .from("bookings")
-      .select("*")
-      .eq("artist_id", user.id)
-      .order("date", { ascending: true })
+    // getSession reads local storage — no network round-trip, so it can't
+    // hang when offline (getUser() pings /auth/v1/user and would stall
+    // forever ahead of the wrapped query below).
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user
+    if (!user) {
+      setListError("You're not signed in.")
+      setListLoading(false)
+      return
+    }
+    const { data, error } = await withTimeout(
+      supabase
+        .from("bookings")
+        .select("*")
+        .eq("artist_id", user.id)
+        .order("date", { ascending: true }),
+      15000,
+      "Loading bookings"
+    )
     if (error) {
       console.error("Bookings fetch error:", error)
       setListError(error.message)

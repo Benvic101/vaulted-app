@@ -4,6 +4,7 @@ import { FileText, Mail, CalendarDays, Plus, ArrowLeft, CheckSquare, Send, Link2
 import ClientPicker from "../components/ClientPicker"
 import ConfirmDeleteDialog from "../components/ConfirmDeleteDialog"
 import ListError from "../components/ListError"
+import withTimeout from "../utils/withTimeout"
 import * as layout from "../styles/layout"
 import { parseLocalDate } from "../utils/dateHelpers"
 import { copyToClipboard } from "../utils/copyToClipboard"
@@ -80,12 +81,25 @@ export default function ConsentForms({ startInForm }) {
   const fetchForms = async () => {
     setListLoading(true)
     setListError(null)
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data, error } = await supabase
-      .from("consent_forms")
-      .select("*")
-      .eq("artist_id", user.id)
-      .order("date", { ascending: false })
+    // getSession reads local storage — no network round-trip, so it can't
+    // hang when offline (getUser() pings /auth/v1/user and would stall
+    // forever ahead of the wrapped query below).
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user
+    if (!user) {
+      setListError("You're not signed in.")
+      setListLoading(false)
+      return
+    }
+    const { data, error } = await withTimeout(
+      supabase
+        .from("consent_forms")
+        .select("*")
+        .eq("artist_id", user.id)
+        .order("date", { ascending: false }),
+      15000,
+      "Loading consent forms"
+    )
     if (error) {
       console.error("Consent forms fetch error:", error)
       setListError(error.message)
