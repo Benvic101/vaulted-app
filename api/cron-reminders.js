@@ -11,6 +11,13 @@
 // constraint: a row is only committed as 'sent' after Resend accepts the
 // email, so a failed send is retried on the next run and a successful send
 // can never be sent twice.
+//
+// Mission 14, Phase 2: this run also writes artist notifications —
+// booking_upcoming for bookings 1 day out (independent of client_email — the
+// artist wants to know the session is tomorrow even if the client never gave
+// an address) and reminder_failed when a reminder email fails. Both are
+// idempotent via the notifications unique(artist_id, type, entity_id)
+// constraint, using onConflict do-nothing so a re-run can never duplicate.
 
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
@@ -19,6 +26,27 @@ const REMINDER_OFFSETS = [
   { type: '3_day', days: 3 },
   { type: '1_day', days: 1 },
 ]
+
+// Best-effort notification insert. Notifications must never break reminder
+// delivery, so any failure is logged and swallowed. onConflict do-nothing
+// against the unique (artist_id, type, entity_id) constraint makes repeat
+// runs no-ops.
+async function insertNotification(supabase, { artistId, type, title, body, entityType, entityId }) {
+  const { error } = await supabase
+    .from('notifications')
+    .insert({
+      artist_id: artistId,
+      type,
+      title,
+      body,
+      entity_type: entityType,
+      entity_id: entityId,
+    })
+    .ignoreDuplicates()
+  if (error) {
+    console.error(`Cron: notification insert failed (${type}, entity ${entityId}):`, error)
+  }
+}
 
 export default async function handler(req, res) {
   // Vercel Cron sends this header automatically when CRON_SECRET is set.
@@ -88,6 +116,20 @@ export default async function handler(req, res) {
       .maybeSingle()
     if (existing && existing.status === 'sent') continue
 
+    // Artist notification for sessions happening tomorrow. Not gated on
+    // client_email — the artist wants the heads-up regardless of whether the
+    // reminder email can even be addressed. 1-day offset only.
+    if (offset.type === '1_day') {
+      await insertNotification(supabase, {
+        artistId: booking.artist_id,
+        type: 'booking_upcoming',
+        title: 'Session tomorrow',
+        body: `${booking.client_name || 'A client'} — ${formatDateTime(booking.date, booking.time)}.`,
+        entityType: 'booking',
+        entityId: booking.id,
+      })
+    }
+
     try {
       await resend.emails.send({
         from: sender,
@@ -125,6 +167,27 @@ export default async function handler(req, res) {
         }, { onConflict: 'booking_id,reminder_type' })
       if (logError) {
         console.error(`Cron: failed to log failure for booking ${booking.id}:`, logError)
+      }
+      // Artist notification: a client reminder email didn't go out. Keyed on
+      // the reminders ROW id (not the booking) so a 3-day and a 1-day failure
+      // for the same booking are two distinct notifications. If the failure
+      // log itself failed (no row id to key on), skip the notification —
+      // the retry next run will surface it then.
+      const { data: failedRow } = await supabase
+        .from('reminders')
+        .select('id')
+        .eq('booking_id', booking.id)
+        .eq('reminder_type', offset.type)
+        .maybeSingle()
+      if (failedRow) {
+        await insertNotification(supabase, {
+          artistId: booking.artist_id,
+          type: 'reminder_failed',
+          title: 'Reminder email failed',
+          body: `The ${offset.type === '1_day' ? '1-day' : '3-day'} reminder to ${booking.client_email || booking.client_name || 'the client'} didn't send. It will retry on the next daily run.`,
+          entityType: 'reminder',
+          entityId: failedRow.id,
+        })
       }
       results.push({ booking: booking.id, type: offset.type, status: 'failed' })
     }

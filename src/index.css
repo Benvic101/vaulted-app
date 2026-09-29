@@ -324,6 +324,15 @@ a:focus-visible,
   .vlt-main {
     margin-left: 72px;
   }
+
+  /* Bell panel: right:0 against the 72px rail would push the panel off the
+     left edge of the viewport — anchor it to the left edge of the bell
+     instead. max-width keeps it clear of the sidebar's own width. */
+  .vlt-notif-sidebar .vlt-notif-panel {
+    right: auto;
+    left: 0;
+    width: 320px;
+  }
 }
 
 @media (max-width: 767px) {

@@ -8,6 +8,7 @@ import Payments from "./Payments"
 import Settings from "./Settings"
 import Portfolio from "./Portfolio"
 import ListError from "../components/ListError"
+import NotificationBell from "../components/NotificationBell"
 
 import {
   LayoutDashboard, CalendarDays, Users, FileText,
@@ -157,6 +158,12 @@ const fetchStats = async (artistId) => {
           style={{ width: "26px", height: "26px", objectFit: "cover", borderRadius: "50%", border: "1px solid var(--border-secondary)" }}
         />
         <h2 style={styles.mobileTopbarTitle}>Vaulted</h2>
+        {/* Bell lives in the mobile top bar too — unread count is visible
+            without opening the drawer. Panel anchors to the bell; width is
+            clamped by maxWidth so it can't overflow phone viewports. */}
+        <div style={{ marginLeft: "auto" }}>
+          <NotificationBell onPage={(page) => { setActivePage(page); setStartInForm(false); closeDrawer() }} />
+        </div>
       </div>
 
       {/* Scrim — only rendered visually on mobile while the drawer is open */}
@@ -212,6 +219,14 @@ const fetchStats = async (artistId) => {
             )
           })}
         </nav>
+
+        {/* Desktop/tablet bell — sits at the bottom of the rail above Logout.
+            The label is hidden by the same .vlt-sidebar-label rules that
+            collapse the nav, so it degrades to icon-only on tablet. */}
+        <div style={styles.sidebarNotifRow} className="vlt-notif-sidebar">
+          <NotificationBell onPage={(page) => { setActivePage(page); setStartInForm(false); closeDrawer() }} />
+          <span style={styles.sidebarNotifLabel} className="vlt-sidebar-label">Notifications</span>
+        </div>
 
         <button
           type="button"
@@ -451,6 +466,17 @@ const styles = {
     fontFamily: "'DM Sans', sans-serif",
   },
   navLabel: { fontSize: "14px" },
+  sidebarNotifRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    padding: "8px 24px",
+    borderTop: "1px solid var(--border-primary)",
+  },
+  sidebarNotifLabel: {
+    color: "var(--text-tertiary)",
+    fontSize: "14px",
+  },
   logoutBtn: {
     display: "flex",
     alignItems: "center",
