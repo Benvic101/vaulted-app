@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useLayoutEffect } from "react"
+import { createPortal } from "react-dom"
 import { supabase } from "../supabase"
 import { Bell, CalendarDays, FileText, MailX, AlertTriangle, CheckCheck } from "lucide-react"
 import withTimeout from "../utils/withTimeout"
@@ -41,6 +42,13 @@ export default function NotificationBell({ onPage }) {
   const [error, setError] = useState(null)
   const panelRef = useRef(null)
   const bellWrapRef = useRef(null)
+  const bellBtnRef = useRef(null)
+  // Panel coordinates. The panel renders in a portal to document.body with
+  // position: fixed, so no ancestor (the fixed sidebar, overflow rules,
+  // z-index stacking) can clip or bury it. Computed from the bell button's
+  // rect on open and on resize/scroll-of-window, clamped to stay inside the
+  // viewport with an 8px margin.
+  const [panelPos, setPanelPos] = useState(null)
 
   const fetchNotifications = useCallback(async () => {
     setLoading(true)
@@ -85,17 +93,49 @@ export default function NotificationBell({ onPage }) {
   }, [fetchNotifications])
 
   // Close the panel on any click outside it (desktop dropdown behavior).
+  // Clicks on the bell button itself are ignored — the button's own onClick
+  // toggles, and since the panel is portaled to document.body it is no longer
+  // spatially "outside" in a way the old wrapper check covered; without this
+  // guard, a mousedown on the bell would close the panel before the click's
+  // toggle ran (open→close→open churn or instant close).
   useEffect(() => {
     if (!open) return
     const onPointerDown = (e) => {
       if (panelRef.current && !panelRef.current.contains(e.target) &&
-          bellWrapRef.current && !bellWrapRef.current.contains(e.target)) {
+          bellBtnRef.current && !bellBtnRef.current.contains(e.target)) {
         setOpen(false)
       }
     }
     document.addEventListener("mousedown", onPointerDown)
     return () => document.removeEventListener("mousedown", onPointerDown)
   }, [open])
+
+  // Position the panel from the bell button's viewport rect. useLayoutEffect
+  // so the first portal paint already has coordinates (no one-frame flash at
+  // 0,0). Fixed positioning + viewport clamping with an 8px margin keeps the
+  // panel fully on-screen regardless of where the bell sits — the sidebar bell
+  // hugs the left viewport edge, where plain right:0 anchoring would push the
+  // panel off-screen (the original bug). Recomputed on resize; window scroll
+  // doesn't apply to the fixed sidebar, but recompute anyway for safety.
+  const updatePanelPos = useCallback(() => {
+    const rect = bellBtnRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const margin = 8
+    const width = Math.min(340, window.innerWidth - margin * 2)
+    let left = rect.right - width
+    left = Math.max(margin, Math.min(left, window.innerWidth - width - margin))
+    let top = rect.bottom + 8
+    const maxTop = window.innerHeight - Math.min(420, window.innerHeight - margin * 2) - margin
+    top = Math.max(margin, Math.min(top, maxTop))
+    setPanelPos({ left, top, width })
+  }, [])
+
+  useLayoutEffect(() => {
+    if (!open) return
+    updatePanelPos()
+    window.addEventListener("resize", updatePanelPos)
+    return () => window.removeEventListener("resize", updatePanelPos)
+  }, [open, updatePanelPos])
 
   const unreadCount = notifications.filter((n) => !n.read_at).length
 
@@ -154,6 +194,7 @@ export default function NotificationBell({ onPage }) {
     <div ref={bellWrapRef} style={styles.wrap} className="vlt-notif-wrap">
       <button
         type="button"
+        ref={bellBtnRef}
         style={styles.bellBtn}
         className="vlt-icon-btn vlt-notif-bell"
         aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
@@ -171,8 +212,14 @@ export default function NotificationBell({ onPage }) {
         )}
       </button>
 
-      {open && (
-        <div ref={panelRef} style={styles.panel} className="vlt-notif-panel" role="dialog" aria-label="Notifications">
+      {open && panelPos && createPortal(
+        <div
+          ref={panelRef}
+          style={{ ...styles.panel, left: panelPos.left, top: panelPos.top, width: panelPos.width }}
+          className="vlt-notif-panel"
+          role="dialog"
+          aria-label="Notifications"
+        >
           <div style={styles.panelHeader}>
             <span style={styles.panelTitle}>Notifications</span>
             {unreadCount > 0 && (
@@ -222,7 +269,8 @@ export default function NotificationBell({ onPage }) {
               })
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
@@ -261,11 +309,11 @@ const styles = {
     boxSizing: "border-box",
   },
   panel: {
-    position: "absolute",
-    top: "calc(100% + 8px)",
-    right: 0,
-    width: "340px",
-    maxWidth: "calc(100vw - 32px)",
+    // Position/size are set inline from panelPos (computed from the bell
+    // button's rect, viewport-clamped) — the component renders in a portal
+    // to document.body with position: fixed so no sidebar clipping/stacking
+    // can affect it.
+    position: "fixed",
     background: "var(--bg-secondary)",
     border: "1px solid var(--border-primary)",
     borderRadius: "12px",
