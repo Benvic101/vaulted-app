@@ -28,23 +28,28 @@ const REMINDER_OFFSETS = [
 ]
 
 // Best-effort notification insert. Notifications must never break reminder
-// delivery, so any failure is logged and swallowed. onConflict do-nothing
-// against the unique (artist_id, type, entity_id) constraint makes repeat
-// runs no-ops.
+// delivery, so any failure is logged and swallowed. upsert with
+// ignoreDuplicates against the notifications_unique_event
+// (artist_id, type, entity_id) constraint makes repeat runs no-ops.
+// Note: ignoreDuplicates is an upsert() option, not a chained insert()
+// method — this was the production crash on 2026-09-29.
 async function insertNotification(supabase, { artistId, type, title, body, entityType, entityId }) {
-  const { error } = await supabase
-    .from('notifications')
-    .insert({
-      artist_id: artistId,
-      type,
-      title,
-      body,
-      entity_type: entityType,
-      entity_id: entityId,
-    })
-    .ignoreDuplicates()
-  if (error) {
-    console.error(`Cron: notification insert failed (${type}, entity ${entityId}):`, error)
+  try {
+    const { error } = await supabase
+      .from('notifications')
+      .upsert({
+        artist_id: artistId,
+        type,
+        title,
+        body,
+        entity_type: entityType,
+        entity_id: entityId,
+      }, { onConflict: 'artist_id,type,entity_id', ignoreDuplicates: true })
+    if (error) {
+      console.error(`Cron: notification upsert failed (${type}, entity ${entityId}):`, error)
+    }
+  } catch (err) {
+    console.error(`Cron: notification upsert threw (${type}, entity ${entityId}):`, err)
   }
 }
 
