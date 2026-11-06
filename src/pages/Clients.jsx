@@ -6,6 +6,7 @@ import ListError from "../components/ListError"
 import withTimeout from "../utils/withTimeout"
 import * as layout from "../styles/layout"
 import ConfirmDialog from "../components/ConfirmDialog"
+import { fetchPlanInfo, isClientLimitError, LIMIT_MESSAGE } from "../utils/plan"
 
 const emptyForm = { name: "", email: "", phone: "", notes: "" }
 
@@ -21,8 +22,14 @@ export default function Clients({ startInForm }) {
   const [clientToDelete, setClientToDelete] = useState(null)
   const [selectedClient, setSelectedClient] = useState(null)
   const [cameFromDetail, setCameFromDetail] = useState(false)
+  const [planInfo, setPlanInfo] = useState(null)
 
   useEffect(() => { fetchClients() }, [])
+
+  const refreshPlan = async () => setPlanInfo(await fetchPlanInfo())
+
+  const atLimit =
+    planInfo?.client_limit != null && clients.length >= planInfo.client_limit
 
   const fetchClients = async () => {
     setListLoading(true)
@@ -53,6 +60,7 @@ export default function Clients({ startInForm }) {
       setClients(data)
     }
     setListLoading(false)
+    refreshPlan()
   }
 
   const handleChange = (e) => {
@@ -60,6 +68,10 @@ export default function Clients({ startInForm }) {
   }
 
   const openNew = () => {
+    if (atLimit) {
+      setMessage(LIMIT_MESSAGE)
+      return
+    }
     setEditingId(null)
     setForm(emptyForm)
     setMessage("")
@@ -171,7 +183,7 @@ const handleDelete = async () => {
         ...form, artist_id: user.id,
       }])
       if (error) {
-        setMessage("Error: " + error.message)
+        setMessage(isClientLimitError(error) ? LIMIT_MESSAGE : "Error: " + error.message)
       } else {
         setMessage("Client added successfully!")
         setForm(emptyForm)
@@ -262,6 +274,14 @@ const handleDelete = async () => {
 
       {view === "list" && (
         <div>
+          {planInfo?.client_limit != null && (
+            <p style={{
+              color: atLimit ? "var(--accent-gold)" : "var(--text-tertiary)",
+              fontSize: "13px", margin: "0 0 16px", fontFamily: "'DM Sans', sans-serif",
+            }}>
+              Free plan · {clients.length} / {planInfo.client_limit} clients
+            </p>
+          )}
           {message && <p style={{ ...styles.message, textAlign: "left", marginBottom: "16px" }}>{message}</p>}
           {listLoading ? (
             <div style={styles.emptyState}>
