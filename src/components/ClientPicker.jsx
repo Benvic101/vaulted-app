@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react"
 import { supabase } from "../supabase"
 import { User, Plus } from "lucide-react"
 import ListError from "./ListError"
+import { isClientLimitError, LIMIT_MESSAGE } from "../utils/plan"
 
 /**
  * Searchable client picker with inline "add new" flow.
@@ -22,6 +23,7 @@ export default function ClientPicker({ value, onChange, placeholder = "Search or
   const [loadError, setLoadError] = useState(null)
   const [highlight, setHighlight] = useState(0)
   const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState(null)
   const wrapRef = useRef(null)
 
   // Load clients for this artist once. Error clearing happens in the
@@ -78,6 +80,7 @@ export default function ClientPicker({ value, onChange, placeholder = "Search or
     const name = query.trim()
     if (!name || creating) return
     setCreating(true)
+    setCreateError(null)
     const { data: { user } } = await supabase.auth.getUser()
     const { data, error } = await supabase
       .from("clients")
@@ -85,7 +88,12 @@ export default function ClientPicker({ value, onChange, placeholder = "Search or
       .select("id, name, email")
       .single()
     setCreating(false)
-    if (!error && data) {
+    if (error) {
+      console.error("Client picker create error:", error)
+      setCreateError(isClientLimitError(error) ? LIMIT_MESSAGE : "Couldn't add client — " + error.message)
+      return
+    }
+    if (data) {
       setClients((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
       selectClient(data)
     }
@@ -154,6 +162,9 @@ export default function ClientPicker({ value, onChange, placeholder = "Search or
               </div>
             </div>
           ))}
+          {createError && (
+            <div style={styles.errorRow}>{createError}</div>
+          )}
           {showAdd && (
             <div
               style={{ ...styles.addRow, background: highlight === matches.length ? "var(--neutral-bg)" : "transparent" }}
@@ -206,6 +217,10 @@ const styles = {
     display: "flex", alignItems: "center", gap: "10px",
     padding: "10px 12px", borderRadius: "6px", cursor: "pointer",
     borderTop: "1px solid var(--border-primary)", marginTop: "2px",
+  },
+  errorRow: {
+    padding: "10px 12px", fontSize: "13px", lineHeight: 1.4,
+    color: "var(--accent-gold)", borderTop: "1px solid var(--border-primary)",
   },
   addText: { color: "var(--accent-gold)", fontSize: "13px" },
   addQuoted: { color: "var(--text-primary)" },
