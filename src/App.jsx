@@ -5,6 +5,11 @@ import { Mail, Lock, User } from "lucide-react"
 import logo from "./assets/logo.png"
 import ForgotPassword from "./pages/ForgotPassword"
 import ResetPassword from "./pages/ResetPassword"
+import {
+  captureReferralFromUrl,
+  getStoredReferralCode,
+  applyReferralIfNeeded,
+} from "./utils/referral"
 
 export default function App() {
   const [session, setSession] = useState(undefined)
@@ -19,6 +24,7 @@ export default function App() {
   const hadSessionRef = useRef(false)
 
     useEffect(() => {
+    captureReferralFromUrl()
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session ?? null)
       hadSessionRef.current = !!data.session
@@ -34,6 +40,13 @@ export default function App() {
     return () => listener.subscription.unsubscribe()
   }, [])
 
+  // Tag the account to its referring creator (Mission 16). No-ops unless the
+  // signup carried a referral code; never blocks or breaks login.
+  const sessionUser = session?.user ?? null
+  useEffect(() => {
+    if (sessionUser) applyReferralIfNeeded(sessionUser)
+  }, [sessionUser?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
   if (window.location.pathname === "/reset-password") {
     return <ResetPassword onDone={() => { window.location.href = "/" }} />
   }
@@ -48,7 +61,17 @@ export default function App() {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) setMessage(error.message)
     } else {
-      const { data, error } = await supabase.auth.signUp({ email, password })
+      // Name and referral code ride along as user_metadata so they follow the
+      // account even if the confirmation link opens in another browser.
+      const refCode = getStoredReferralCode()
+      const metadata = {}
+      if (fullName.trim()) metadata.full_name = fullName.trim()
+      if (refCode) metadata.referral_code = refCode
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: metadata },
+      })
       if (error) {
         setMessage(error.message)
       } else {
